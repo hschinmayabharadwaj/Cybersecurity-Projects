@@ -17,7 +17,7 @@ type CreateRequest struct {
 	TelegramChat  string          `json:"telegram_chat"         validate:"required_if=AlertChannel telegram"`
 	WebhookURL    string          `json:"webhook_url"           validate:"required_if=AlertChannel webhook,omitempty,url"`
 	Metadata      json.RawMessage `json:"metadata"`
-	TurnstileResp string          `json:"cf_turnstile_response" validate:"required"`
+	TurnstileResp string          `json:"cf_turnstile_response"`
 }
 
 type Response struct {

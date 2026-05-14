@@ -26,6 +26,20 @@ type Config struct {
 	Canary    CanaryConfig    `koanf:"canary"`
 	Turnstile TurnstileConfig `koanf:"turnstile"`
 	MySQL     MySQLConfig     `koanf:"mysql"`
+	Notify    NotifyConfig    `koanf:"notify"`
+}
+
+type NotifyConfig struct {
+	DedupTTL          time.Duration `koanf:"dedup_ttl"`
+	SendTimeout       time.Duration `koanf:"send_timeout"`
+	MaxTries          uint          `koanf:"max_tries"`
+	MaxElapsed        time.Duration `koanf:"max_elapsed"`
+	InitialInterval   time.Duration `koanf:"initial_interval"`
+	RetentionInterval time.Duration `koanf:"retention_interval"`
+	RetentionLimit    int           `koanf:"retention_limit"`
+	WebhookHMACSecret string        `koanf:"webhook_hmac_secret"`
+	TelegramAPIBase   string        `koanf:"telegram_api_base"`
+	FingerprintWindow time.Duration `koanf:"fingerprint_window"`
 }
 
 type CanaryConfig struct {
@@ -75,9 +89,13 @@ type RedisConfig struct {
 }
 
 type RateLimitConfig struct {
-	Requests int           `koanf:"requests"`
-	Window   time.Duration `koanf:"window"`
-	Burst    int           `koanf:"burst"`
+	Requests        int           `koanf:"requests"`
+	Window          time.Duration `koanf:"window"`
+	Burst           int           `koanf:"burst"`
+	CreateMinRate   int           `koanf:"create_min_rate"`
+	CreateMinBurst  int           `koanf:"create_min_burst"`
+	CreateHourRate  int           `koanf:"create_hour_rate"`
+	CreateHourBurst int           `koanf:"create_hour_burst"`
 }
 
 type CORSConfig struct {
@@ -182,9 +200,13 @@ func loadDefaults(k *koanf.Koanf) error {
 		"redis.pool_size":      10,
 		"redis.min_idle_conns": 5,
 
-		"rate_limit.requests": 100,
-		"rate_limit.window":   "1m",
-		"rate_limit.burst":    20,
+		"rate_limit.requests":          100,
+		"rate_limit.window":            "1m",
+		"rate_limit.burst":             20,
+		"rate_limit.create_min_rate":   5,
+		"rate_limit.create_min_burst":  5,
+		"rate_limit.create_hour_rate":  20,
+		"rate_limit.create_hour_burst": 5,
 
 		"cors.allowed_origins": []string{"http://localhost:3000"},
 		"cors.allowed_methods": []string{
@@ -222,6 +244,17 @@ func loadDefaults(k *koanf.Koanf) error {
 		"mysql.addr":        "0.0.0.0:3306",
 		"mysql.public_host": "localhost",
 		"mysql.public_port": 3306,
+
+		"notify.dedup_ttl":           "15m",
+		"notify.send_timeout":        "30s",
+		"notify.max_tries":           3,
+		"notify.max_elapsed":         "30s",
+		"notify.initial_interval":    "500ms",
+		"notify.retention_interval":  "1h",
+		"notify.retention_limit":     100,
+		"notify.webhook_hmac_secret": "",
+		"notify.telegram_api_base":   "https://api.telegram.org",
+		"notify.fingerprint_window":  "5m",
 	}
 
 	for key, value := range defaults {
@@ -234,30 +267,44 @@ func loadDefaults(k *koanf.Koanf) error {
 }
 
 var envKeyMap = map[string]string{
-	"DATABASE_URL":                "database.url",
-	"REDIS_URL":                   "redis.url",
-	"APP_ENVIRONMENT":             "app.environment",
-	"HOST":                        "server.host",
-	"PORT":                        "server.port",
-	"LOG_LEVEL":                   "log.level",
-	"LOG_FORMAT":                  "log.format",
-	"RATE_LIMIT_REQUESTS":         "rate_limit.requests",
-	"RATE_LIMIT_WINDOW":           "rate_limit.window",
-	"RATE_LIMIT_BURST":            "rate_limit.burst",
-	"OTEL_ENDPOINT":               "otel.endpoint",
-	"OTEL_EXPORTER_OTLP_ENDPOINT": "otel.endpoint",
-	"OTEL_SERVICE_NAME":           "otel.service_name",
-	"OTEL_ENABLED":                "otel.enabled",
-	"OTEL_INSECURE":               "otel.insecure",
-	"OTEL_SAMPLE_RATE":            "otel.sample_rate",
-	"CANARY_BASE_URL":             "canary.base_url",
-	"CANARY_MANAGE_URL":           "canary.manage_url",
-	"TURNSTILE_SECRET_KEY":        "turnstile.secret_key",
-	"TURNSTILE_SITE_KEY":          "turnstile.site_key",
-	"MYSQL_ENABLED":               "mysql.enabled",
-	"MYSQL_ADDR":                  "mysql.addr",
-	"MYSQL_PUBLIC_HOST":           "mysql.public_host",
-	"MYSQL_PUBLIC_PORT":           "mysql.public_port",
+	"DATABASE_URL":                 "database.url",
+	"REDIS_URL":                    "redis.url",
+	"APP_ENVIRONMENT":              "app.environment",
+	"HOST":                         "server.host",
+	"PORT":                         "server.port",
+	"LOG_LEVEL":                    "log.level",
+	"LOG_FORMAT":                   "log.format",
+	"RATE_LIMIT_REQUESTS":          "rate_limit.requests",
+	"RATE_LIMIT_WINDOW":            "rate_limit.window",
+	"RATE_LIMIT_BURST":             "rate_limit.burst",
+	"OTEL_ENDPOINT":                "otel.endpoint",
+	"OTEL_EXPORTER_OTLP_ENDPOINT":  "otel.endpoint",
+	"OTEL_SERVICE_NAME":            "otel.service_name",
+	"OTEL_ENABLED":                 "otel.enabled",
+	"OTEL_INSECURE":                "otel.insecure",
+	"OTEL_SAMPLE_RATE":             "otel.sample_rate",
+	"CANARY_BASE_URL":              "canary.base_url",
+	"CANARY_MANAGE_URL":            "canary.manage_url",
+	"TURNSTILE_SECRET_KEY":         "turnstile.secret_key",
+	"TURNSTILE_SITE_KEY":           "turnstile.site_key",
+	"MYSQL_ENABLED":                "mysql.enabled",
+	"MYSQL_ADDR":                   "mysql.addr",
+	"MYSQL_PUBLIC_HOST":            "mysql.public_host",
+	"MYSQL_PUBLIC_PORT":            "mysql.public_port",
+	"RATE_LIMIT_CREATE_MIN_RATE":   "rate_limit.create_min_rate",
+	"RATE_LIMIT_CREATE_MIN_BURST":  "rate_limit.create_min_burst",
+	"RATE_LIMIT_CREATE_HOUR_RATE":  "rate_limit.create_hour_rate",
+	"RATE_LIMIT_CREATE_HOUR_BURST": "rate_limit.create_hour_burst",
+	"NOTIFY_DEDUP_TTL":             "notify.dedup_ttl",
+	"NOTIFY_SEND_TIMEOUT":          "notify.send_timeout",
+	"NOTIFY_MAX_TRIES":             "notify.max_tries",
+	"NOTIFY_MAX_ELAPSED":           "notify.max_elapsed",
+	"NOTIFY_INITIAL_INTERVAL":      "notify.initial_interval",
+	"NOTIFY_RETENTION_INTERVAL":    "notify.retention_interval",
+	"NOTIFY_RETENTION_LIMIT":       "notify.retention_limit",
+	"WEBHOOK_HMAC_SECRET":          "notify.webhook_hmac_secret",
+	"NOTIFY_TELEGRAM_API_BASE":     "notify.telegram_api_base",
+	"NOTIFY_FINGERPRINT_WINDOW":    "notify.fingerprint_window",
 }
 
 func envKeyReplacer(s string) string {

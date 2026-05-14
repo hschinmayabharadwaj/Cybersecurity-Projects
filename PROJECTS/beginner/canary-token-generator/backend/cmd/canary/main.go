@@ -5,10 +5,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -22,6 +24,9 @@ import (
 	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/event"
 	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/health"
 	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/middleware"
+	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/notify"
+	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/notify/telegram"
+	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/notify/webhook"
 	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/server"
 	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/token"
 	"github.com/CarterPerez-dev/cybersecurity-projects/canary-token-generator/backend/internal/token/generators/mysql"
@@ -86,6 +91,14 @@ func run(configPath string) error {
 	}
 	logger.Info("redis connected")
 
+	notifySvc, eventSvc := buildEventStack(
+		cfg,
+		logger,
+		eventRepo,
+		tokenRepo,
+		rdb,
+	)
+
 	genRegistry := registry.Build(registry.Config{
 		BaseURL:         cfg.Canary.BaseURL,
 		MySQLPublicHost: cfg.MySQL.PublicHost,
@@ -108,19 +121,19 @@ func run(configPath string) error {
 	healthH := health.NewHandler(db, rdb)
 	tokenH := token.NewHandler(
 		tokenSvc,
-		&directEventRecorder{
+		&eventRecorderAdapter{svc: eventSvc},
+		&fingerprintRecorderAdapter{
 			repo:   eventRepo,
-			tokens: tokenRepo,
-			logger: logger,
+			window: cfg.Notify.FingerprintWindow,
 		},
-		nil,
 		logger,
 	)
 
 	srv := mountRouter(cfg, logger, rdb, healthH, tokenH, verifier)
 
 	var wg sync.WaitGroup
-	spawnMySQLListener(ctx, cfg, logger, &wg, tokenSvc, eventRepo, tokenRepo)
+	spawnMySQLListener(ctx, cfg, logger, &wg, tokenSvc, eventSvc)
+	spawnRetentionLoop(ctx, cfg, &wg, eventSvc)
 
 	errChan := make(chan error, 1)
 	go func() { errChan <- srv.Start() }()
@@ -133,8 +146,51 @@ func run(configPath string) error {
 	}
 
 	shutdownErr := gracefulShutdown(cfg, logger, srv, telemetry, rdb, db)
+	logger.Info("waiting for in-flight notifications")
+	notifySvc.Wait()
 	wg.Wait()
 	return shutdownErr
+}
+
+func buildEventStack(
+	cfg *config.Config,
+	logger *slog.Logger,
+	eventRepo *event.Repository,
+	tokenRepo *token.Repository,
+	rdb *core.Redis,
+) (*notify.Service, *event.Service) {
+	tgSender := telegram.NewSender(telegram.Config{
+		APIBase:         cfg.Notify.TelegramAPIBase,
+		ManageURL:       cfg.Canary.ManageURL,
+		MaxTries:        cfg.Notify.MaxTries,
+		MaxElapsed:      cfg.Notify.MaxElapsed,
+		InitialInterval: cfg.Notify.InitialInterval,
+	})
+	whSender := webhook.NewSender(webhook.Config{
+		ManageURL:       cfg.Canary.ManageURL,
+		HMACSecret:      cfg.Notify.WebhookHMACSecret,
+		MaxTries:        cfg.Notify.MaxTries,
+		MaxElapsed:      cfg.Notify.MaxElapsed,
+		InitialInterval: cfg.Notify.InitialInterval,
+	})
+
+	notifySvc := notify.NewService(eventRepo,
+		notify.WithLogger(logger),
+		notify.WithSendTimeout(cfg.Notify.SendTimeout),
+	)
+	notifySvc.Register(tgSender, whSender)
+
+	eventSvc := event.NewService(
+		eventRepo,
+		tokenRepo,
+		rdb.Client,
+		notifySvc,
+		event.ServiceConfig{
+			DedupTTL: cfg.Notify.DedupTTL,
+			Logger:   logger,
+		},
+	)
+	return notifySvc, eventSvc
 }
 
 func spawnMySQLListener(
@@ -143,8 +199,7 @@ func spawnMySQLListener(
 	logger *slog.Logger,
 	wg *sync.WaitGroup,
 	tokenSvc *token.Service,
-	eventRepo *event.Repository,
-	tokenRepo *token.Repository,
+	eventSvc *event.Service,
 ) {
 	if !cfg.MySQL.Enabled {
 		return
@@ -154,15 +209,31 @@ func spawnMySQLListener(
 		defer wg.Done()
 		handler := mysql.NewHandler(
 			&mysqlTokenLookup{svc: tokenSvc},
-			&mysqlEventRecorder{
-				repo:   eventRepo,
-				tokens: tokenRepo,
-				logger: logger,
-			},
+			&eventRecorderAdapter{svc: eventSvc},
 		)
 		if mErr := mysql.Run(ctx, cfg.MySQL.Addr, handler); mErr != nil {
 			logger.Error("mysql server error", "error", mErr)
 		}
+	}()
+}
+
+func spawnRetentionLoop(
+	ctx context.Context,
+	cfg *config.Config,
+	wg *sync.WaitGroup,
+	eventSvc *event.Service,
+) {
+	if cfg.Notify.RetentionInterval <= 0 || cfg.Notify.RetentionLimit <= 0 {
+		return
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		eventSvc.RunRetentionLoop(
+			ctx,
+			cfg.Notify.RetentionInterval,
+			cfg.Notify.RetentionLimit,
+		)
 	}()
 }
 
@@ -189,6 +260,29 @@ func mountRouter(
 	healthH.RegisterRoutes(r)
 	tokenH.RegisterTriggerRoutes(r)
 
+	createMin := middleware.NewRateLimiter(
+		rdb.Client,
+		middleware.RateLimitConfig{
+			Limit: middleware.PerMinute(
+				cfg.RateLimit.CreateMinRate,
+				cfg.RateLimit.CreateMinBurst,
+			),
+			KeyFunc:  keyByCreateMin,
+			FailOpen: true,
+		},
+	).Handler
+	createHour := middleware.NewRateLimiter(
+		rdb.Client,
+		middleware.RateLimitConfig{
+			Limit: middleware.PerHour(
+				cfg.RateLimit.CreateHourRate,
+				cfg.RateLimit.CreateHourBurst,
+			),
+			KeyFunc:  keyByCreateHour,
+			FailOpen: true,
+		},
+	).Handler
+
 	r.Route("/api", func(api chi.Router) {
 		api.Use(middleware.CORS(cfg.CORS))
 		api.Use(
@@ -202,11 +296,22 @@ func mountRouter(
 			}).Handler,
 		)
 		api.Get("/tokens/types", tokenH.GetTypes)
-		api.With(middleware.TurnstileVerify(verifier)).
-			Post("/tokens", tokenH.CreateToken)
+		api.With(
+			createMin,
+			createHour,
+			middleware.TurnstileVerify(verifier),
+		).Post("/tokens", tokenH.CreateToken)
 	})
 
 	return srv
+}
+
+func keyByCreateMin(r *http.Request) string {
+	return "ratelimit:create:min:" + middleware.ExtractFingerprint(r)
+}
+
+func keyByCreateHour(r *http.Request) string {
+	return "ratelimit:create:hour:" + middleware.ExtractFingerprint(r)
 }
 
 func gracefulShutdown(
@@ -291,25 +396,35 @@ func (a registryAdapter) Get(t token.Type) (token.Generator, bool) {
 	return g, ok
 }
 
-type directEventRecorder struct {
-	repo   *event.Repository
-	tokens *token.Repository
-	logger *slog.Logger
+type eventRecorderAdapter struct {
+	svc *event.Service
 }
 
-func (d *directEventRecorder) Record(
+func (a *eventRecorderAdapter) Record(
 	ctx context.Context,
 	t *token.Token,
 	evt *event.Event,
 ) error {
-	if err := d.repo.Insert(ctx, evt); err != nil {
-		return fmt.Errorf("insert event: %w", err)
-	}
-	if err := d.tokens.IncrementTriggerCount(ctx, t.ID); err != nil {
-		d.logger.WarnContext(ctx, "increment trigger count",
-			"error", err, "token_id", t.ID)
-	}
-	return nil
+	return a.svc.Record(ctx, t.NotifyInfo(), evt)
+}
+
+type fingerprintRecorderAdapter struct {
+	repo   *event.Repository
+	window time.Duration
+}
+
+func (f *fingerprintRecorderAdapter) AttachFingerprint(
+	ctx context.Context,
+	tokenID, sourceIP string,
+	fingerprint json.RawMessage,
+) error {
+	return f.repo.AttachFingerprint(
+		ctx,
+		tokenID,
+		sourceIP,
+		fingerprint,
+		f.window,
+	)
 }
 
 type mysqlTokenLookup struct{ svc *token.Service }
@@ -319,25 +434,4 @@ func (m *mysqlTokenLookup) GetByID(
 	id string,
 ) (*token.Token, error) {
 	return m.svc.GetByID(ctx, id)
-}
-
-type mysqlEventRecorder struct {
-	repo   *event.Repository
-	tokens *token.Repository
-	logger *slog.Logger
-}
-
-func (m *mysqlEventRecorder) Record(
-	ctx context.Context,
-	t *token.Token,
-	evt *event.Event,
-) error {
-	if err := m.repo.Insert(ctx, evt); err != nil {
-		return fmt.Errorf("insert event: %w", err)
-	}
-	if err := m.tokens.IncrementTriggerCount(ctx, t.ID); err != nil {
-		m.logger.WarnContext(ctx, "mysql: increment trigger count",
-			"error", err, "token_id", t.ID)
-	}
-	return nil
 }
