@@ -45,6 +45,7 @@ type ServiceRepository interface {
 	Insert(ctx context.Context, t *Token) error
 	GetByID(ctx context.Context, id string) (*Token, error)
 	GetByManageID(ctx context.Context, manageID string) (*Token, error)
+	DeleteByManageID(ctx context.Context, manageID string) error
 	IncrementTriggerCount(ctx context.Context, id string) error
 }
 
@@ -179,6 +180,13 @@ func (s *Service) IncrementTriggerCount(
 	id string,
 ) error {
 	return s.repo.IncrementTriggerCount(ctx, id)
+}
+
+func (s *Service) DeleteByManageID(
+	ctx context.Context,
+	manageID string,
+) error {
+	return s.repo.DeleteByManageID(ctx, manageID)
 }
 
 func (s *Service) TriggerURL(id string) string {

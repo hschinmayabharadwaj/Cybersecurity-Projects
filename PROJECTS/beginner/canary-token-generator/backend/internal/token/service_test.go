@@ -73,6 +73,21 @@ func (f *fakeRepo) IncrementTriggerCount(_ context.Context, _ string) error {
 	return nil
 }
 
+func (f *fakeRepo) DeleteByManageID(
+	_ context.Context,
+	manageID string,
+) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, ok := f.byManage[manageID]
+	if !ok {
+		return token.ErrNotFound
+	}
+	delete(f.byManage, manageID)
+	delete(f.byID, t.ID)
+	return nil
+}
+
 type fakeGenerator struct {
 	tokenType   token.Type
 	artifact    generators.Artifact

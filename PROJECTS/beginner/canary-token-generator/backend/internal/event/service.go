@@ -5,8 +5,10 @@ package event
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -15,6 +17,7 @@ import (
 const (
 	dedupKeyPrefix  = "dedup:trigger:"
 	defaultDedupTTL = 15 * time.Minute
+	dedupScanBatch  = 100
 )
 
 type Service struct {
@@ -116,6 +119,49 @@ func (s *Service) dedupGate(
 			"error", iErr, "key", key)
 	}
 	return false
+}
+
+func (s *Service) CountActiveDedup(
+	ctx context.Context,
+	tokenID string,
+) (int64, error) {
+	if s.rdb == nil {
+		return 0, nil
+	}
+	pattern := dedupKeyPrefix + tokenID + ":*"
+	var total int64
+	var cursor uint64
+	for {
+		keys, next, err := s.rdb.Scan(
+			ctx, cursor, pattern, dedupScanBatch,
+		).Result()
+		if err != nil {
+			return 0, fmt.Errorf("dedup scan: %w", err)
+		}
+		for _, key := range keys {
+			v, gErr := s.rdb.Get(ctx, key).Result()
+			if errors.Is(gErr, redis.Nil) {
+				continue
+			}
+			if gErr != nil {
+				s.logger.WarnContext(ctx, "dedup count: get key",
+					"error", gErr, "key", key)
+				continue
+			}
+			n, pErr := strconv.ParseInt(v, 10, 64)
+			if pErr != nil {
+				continue
+			}
+			if n > 1 {
+				total += n - 1
+			}
+		}
+		if next == 0 {
+			break
+		}
+		cursor = next
+	}
+	return total, nil
 }
 
 func (s *Service) RunRetentionLoop(

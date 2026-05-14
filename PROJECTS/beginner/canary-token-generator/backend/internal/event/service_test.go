@@ -487,6 +487,118 @@ func TestService_Record_ConcurrentSafe(t *testing.T) {
 	require.Equal(t, n, notifier.callCount())
 }
 
+func TestService_CountActiveDedup_NoKeysReturnsZero(t *testing.T) {
+	t.Parallel()
+	rdb, _ := setupRedis(t)
+	svc := newSvc(t, &fakeStore{}, &fakeIncrementer{}, rdb, nil)
+
+	n, err := svc.CountActiveDedup(context.Background(), testTokenID)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), n)
+}
+
+func TestService_CountActiveDedup_FirstTriggerOnlyCountsZero(t *testing.T) {
+	t.Parallel()
+	rdb, _ := setupRedis(t)
+	svc := newSvc(t, &fakeStore{}, &fakeIncrementer{}, rdb, nil)
+
+	require.NoError(
+		t,
+		svc.Record(
+			context.Background(),
+			sampleInfo(),
+			sampleEvent("203.0.113.1"),
+		),
+	)
+
+	n, err := svc.CountActiveDedup(context.Background(), testTokenID)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), n,
+		"first trigger fires the notification; nothing silenced yet")
+}
+
+func TestService_CountActiveDedup_CountsSilencedAcrossIPs(t *testing.T) {
+	t.Parallel()
+	rdb, _ := setupRedis(t)
+	svc := newSvc(t, &fakeStore{}, &fakeIncrementer{}, rdb, nil)
+
+	for range 3 {
+		require.NoError(
+			t,
+			svc.Record(
+				context.Background(),
+				sampleInfo(),
+				sampleEvent("203.0.113.1"),
+			),
+		)
+	}
+	for range 5 {
+		require.NoError(
+			t,
+			svc.Record(
+				context.Background(),
+				sampleInfo(),
+				sampleEvent("203.0.113.2"),
+			),
+		)
+	}
+
+	n, err := svc.CountActiveDedup(context.Background(), testTokenID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2+4), n,
+		"key1=3 (silenced 2) + key2=5 (silenced 4)")
+}
+
+func TestService_CountActiveDedup_IgnoresOtherTokens(t *testing.T) {
+	t.Parallel()
+	rdb, _ := setupRedis(t)
+	svc := newSvc(t, &fakeStore{}, &fakeIncrementer{}, rdb, nil)
+
+	for range 3 {
+		require.NoError(
+			t,
+			svc.Record(
+				context.Background(),
+				sampleInfo(),
+				sampleEvent("203.0.113.1"),
+			),
+		)
+	}
+	otherInfo := sampleInfo()
+	otherInfo.TokenID = "tokother0001"
+	for range 4 {
+		require.NoError(
+			t,
+			svc.Record(
+				context.Background(),
+				otherInfo,
+				&event.Event{TokenID: "tokother0001", SourceIP: "203.0.113.5"},
+			),
+		)
+	}
+
+	n, err := svc.CountActiveDedup(context.Background(), testTokenID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), n, "only this token's keys counted")
+}
+
+func TestService_CountActiveDedup_NilRedisReturnsZero(t *testing.T) {
+	t.Parallel()
+	svc := event.NewService(
+		&fakeStore{},
+		&fakeIncrementer{},
+		nil,
+		nil,
+		event.ServiceConfig{
+			DedupTTL: 15 * time.Minute,
+			Logger:   slog.New(slog.NewTextHandler(testWriter{t}, nil)),
+		},
+	)
+	n, err := svc.CountActiveDedup(context.Background(), testTokenID)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), n)
+}
+
 func TestService_RunRetentionLoop_PrunesAtInterval(t *testing.T) {
 	t.Parallel()
 	store := &fakeStore{pruneCount: 5}
