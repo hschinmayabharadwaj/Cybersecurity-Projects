@@ -40,11 +40,10 @@
 }
 
 .headline {
-  font-family: $font-sans;
-  font-weight: 900;
+  font-family: $font-display;
   font-size: clamp(2.25rem, 8vw, 5.5rem);
-  letter-spacing: -0.05em;
-  line-height: 0.9;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
   text-transform: uppercase;
   color: $ink;
   margin: 0;

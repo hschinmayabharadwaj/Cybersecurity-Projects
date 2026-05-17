@@ -71,11 +71,10 @@
 }
 
 .headline {
-  font-family: $font-sans;
-  font-weight: 900;
+  font-family: $font-display;
   font-size: clamp(2.25rem, 8vw, 6rem);
-  letter-spacing: -0.05em;
-  line-height: 0.9;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
   text-transform: uppercase;
   color: $ink;
   margin: 0;
@@ -325,7 +324,7 @@
 
 .deleteTitle {
   font-family: $font-sans;
-  font-weight: 800;
+  font-weight: 700;
   font-size: clamp(1.25rem, 3vw, 1.75rem);
   letter-spacing: -0.02em;
   text-transform: uppercase;

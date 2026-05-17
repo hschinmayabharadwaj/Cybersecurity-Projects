@@ -37,11 +37,10 @@
 }
 
 .headline {
-  font-family: $font-sans;
-  font-weight: 900;
+  font-family: $font-display;
   font-size: clamp(3rem, 11vw, 8.5rem);
-  letter-spacing: -0.06em;
-  line-height: 0.85;
+  letter-spacing: -0.04em;
+  line-height: 0.88;
   color: $ink;
   margin: 0;
   text-transform: uppercase;
@@ -113,7 +112,7 @@
 
 .sectionTitle {
   font-family: $font-sans;
-  font-weight: 800;
+  font-weight: 700;
   font-size: clamp(1.5rem, 3vw, 2.25rem);
   letter-spacing: -0.03em;
   line-height: $line-height-tight;
@@ -455,11 +454,10 @@
 .resultHeadline {
   grid-row: 1;
   grid-column: 2;
-  font-family: $font-sans;
-  font-weight: 900;
+  font-family: $font-display;
   font-size: clamp(2rem, 5vw, 3.5rem);
-  letter-spacing: -0.04em;
-  line-height: 0.9;
+  letter-spacing: -0.03em;
+  line-height: 0.92;
   text-transform: uppercase;
   color: $ink;
   margin: 0;
