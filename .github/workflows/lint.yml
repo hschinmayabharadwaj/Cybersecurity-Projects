@@ -221,7 +221,7 @@ jobs:
 
     - name: Install golangci-lint
       if: matrix.type == 'go'
-      run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.1
 
     # Nim Setup
     - name: Setup Nim
@@ -234,10 +234,10 @@ jobs:
       if: matrix.type == 'nim'
       run: nimble install -y nph
 
-    # Rust Setup
-    - name: Install Rust stable
+    # Rust Setup (pinned to match locally-verified clippy version)
+    - name: Install Rust 1.92.0
       if: matrix.type == 'rust'
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@1.92.0
       with:
         components: rustfmt, clippy
 
@@ -248,11 +248,17 @@ jobs:
         workspaces: "${{ matrix.path }} -> target"
 
     # Crystal Setup
+    - name: Install libyaml-dev (ameba dep)
+      if: matrix.type == 'crystal'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y libyaml-dev
+
     - name: Install Crystal
       if: matrix.type == 'crystal'
       uses: crystal-lang/install-crystal@v1
       with:
-        crystal: latest
+        crystal: 1.20.0
 
     - name: Cache shards
       if: matrix.type == 'crystal'
@@ -268,20 +274,19 @@ jobs:
       if: matrix.type == 'crystal'
       run: shards install
 
-    # V (Vlang) Setup
+    # V (Vlang) Setup (no check-latest — master drift breaks fmt parity)
     - name: Install V
       if: matrix.type == 'v'
       uses: vlang/setup-v@v1.4
-      with:
-        check-latest: true
 
-    # C++ Setup
-    - name: Install clang-format-19 and cppcheck
+    # C++ Setup (pinned clang-format via PyPI wheel — apt patch versions drift)
+    - name: Install clang-format and cppcheck
       if: matrix.type == 'cpp'
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y clang-format-19 cppcheck
-        sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100
+        sudo apt-get install -y cppcheck python3-pip
+        pip install --user --break-system-packages clang-format==19.1.7
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     # Bash Setup (shellcheck pre-installed on ubuntu-latest, but ensure latest)
     - name: Install shellcheck
