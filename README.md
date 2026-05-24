@@ -20,7 +20,7 @@
   </a>
 </div>
 
-<p align="center">Made possible by <a href="https://certgames.com/mentorship"><strong>CertGames</strong></a></p>
+<p align="center">Made possible by <a href="https://certgames.com"><strong>CertGames</strong></a></p>
 
 <h2 align="center"><strong>View Complete Projects:</strong></h2>
 <div align="center">
