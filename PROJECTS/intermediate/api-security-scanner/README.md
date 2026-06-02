@@ -16,7 +16,19 @@
 
 > Full-stack API vulnerability scanner targeting the OWASP API Security Top 10 with configurable scan modules and a React dashboard.
 
-*This is a quick overview — security theory, architecture, and full walkthroughs are in the [learn modules](#learn).*
+<p align="center">
+  <a href="https://youtu.be/CvuvFfh24cE">
+    <img src="https://img.shields.io/badge/Watch_on-YouTube-FF0000?logo=youtube&logoColor=white" alt="Watch on YouTube">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/CvuvFfh24cE">
+    <img src="https://img.youtube.com/vi/CvuvFfh24cE/maxresdefault.jpg" alt="Video Thumbnail" width="800">
+  </a>
+</p>
+
+*Learn docs here: [learn modules](#learn).*
 
 ## What It Does
 
