@@ -113,11 +113,7 @@ export function DashboardPage() {
                   axisLine={false}
                 />
                 <Tooltip contentStyle={TOOLTIP_STYLE} cursor={false} />
-                <Bar
-                  dataKey="count"
-                  fill="oklch(70% 0.19 55)"
-                  radius={0}
-                />
+                <Bar dataKey="count" fill="oklch(70% 0.19 55)" radius={0} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -143,28 +139,24 @@ export function DashboardPage() {
           <section className={styles.panel}>
             <h2 className={styles.panelLabel}>Top Usernames</h2>
             <div className={styles.list}>
-              {credentials.top_usernames
-                .slice(0, TOP_CREDS_LIMIT)
-                .map((u) => (
-                  <div key={u.value} className={styles.listRow}>
-                    <span className={styles.listLabel}>{u.value}</span>
-                    <span className={styles.listValue}>{u.count}</span>
-                  </div>
-                ))}
+              {credentials.top_usernames.slice(0, TOP_CREDS_LIMIT).map((u) => (
+                <div key={u.value} className={styles.listRow}>
+                  <span className={styles.listLabel}>{u.value}</span>
+                  <span className={styles.listValue}>{u.count}</span>
+                </div>
+              ))}
             </div>
           </section>
 
           <section className={styles.panel}>
             <h2 className={styles.panelLabel}>Top Passwords</h2>
             <div className={styles.list}>
-              {credentials.top_passwords
-                .slice(0, TOP_CREDS_LIMIT)
-                .map((p) => (
-                  <div key={p.value} className={styles.listRow}>
-                    <span className={styles.listLabel}>{p.value}</span>
-                    <span className={styles.listValue}>{p.count}</span>
-                  </div>
-                ))}
+              {credentials.top_passwords.slice(0, TOP_CREDS_LIMIT).map((p) => (
+                <div key={p.value} className={styles.listRow}>
+                  <span className={styles.listLabel}>{p.value}</span>
+                  <span className={styles.listValue}>{p.count}</span>
+                </div>
+              ))}
             </div>
           </section>
         </div>

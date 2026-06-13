@@ -27,9 +27,7 @@ Connects to:
 #include "src/attack/DictionaryAttack.hpp"
 #include <algorithm>
 
-static std::size_t count_lines_in_range(const char* data,
-                                        std::size_t start,
-                                        std::size_t end) {
+static std::size_t count_lines_in_range(const char *data, std::size_t start, std::size_t end) {
     std::size_t count = 0;
     for (std::size_t i = start; i < end; ++i) {
         if (data[i] == '\n') {
@@ -39,23 +37,21 @@ static std::size_t count_lines_in_range(const char* data,
     return count;
 }
 
-static std::size_t find_next_newline(const char* data,
-                                     std::size_t pos,
-                                     std::size_t size) {
+static std::size_t find_next_newline(const char *data, std::size_t pos, std::size_t size) {
     while (pos < size && data[pos] != '\n') {
         ++pos;
     }
     return pos < size ? pos + 1 : size;
 }
 
-std::expected<DictionaryAttack, CrackError> DictionaryAttack::create(
-    std::string_view path, unsigned thread_index, unsigned total_threads) {
+std::expected<DictionaryAttack, CrackError>
+DictionaryAttack::create(std::string_view path, unsigned thread_index, unsigned total_threads) {
     auto file = MappedFile::open(path);
     if (!file.has_value()) {
         return std::unexpected(file.error());
     }
 
-    auto* data = file->data();
+    auto *data = file->data();
     auto file_size = file->size();
 
     std::size_t total_lines = count_lines_in_range(data, 0, file_size);
@@ -66,10 +62,9 @@ std::expected<DictionaryAttack, CrackError> DictionaryAttack::create(
     std::size_t lines_per_thread = total_lines / total_threads;
     std::size_t remainder = total_lines % total_threads;
 
-    std::size_t my_start_line = thread_index * lines_per_thread
-        + std::min(static_cast<std::size_t>(thread_index), remainder);
-    std::size_t my_line_count = lines_per_thread
-        + (thread_index < remainder ? 1 : 0);
+    std::size_t my_start_line = thread_index * lines_per_thread +
+                                std::min(static_cast<std::size_t>(thread_index), remainder);
+    std::size_t my_line_count = lines_per_thread + (thread_index < remainder ? 1 : 0);
 
     std::size_t start_offset = 0;
     for (std::size_t i = 0; i < my_start_line; ++i) {
@@ -116,5 +111,9 @@ std::expected<std::string, AttackComplete> DictionaryAttack::next() {
     return std::unexpected(AttackComplete{});
 }
 
-std::size_t DictionaryAttack::total() const { return total_words_; }
-std::size_t DictionaryAttack::progress() const { return words_read_; }
+std::size_t DictionaryAttack::total() const {
+    return total_words_;
+}
+std::size_t DictionaryAttack::progress() const {
+    return words_read_;
+}

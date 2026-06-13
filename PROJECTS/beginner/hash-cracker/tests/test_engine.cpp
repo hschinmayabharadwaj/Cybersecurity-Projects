@@ -16,14 +16,13 @@ Connects to:
   tests/data/small_wordlist.txt - fixture wordlist
 */
 
-#include <gtest/gtest.h>
 #include "src/core/Engine.hpp"
 #include "src/hash/SHA256Hasher.hpp"
+#include <gtest/gtest.h>
 
 TEST(EngineTest, CracksSHA256WithDictionary) {
     CrackConfig cfg;
-    cfg.target_hash =
-        "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8";
+    cfg.target_hash = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8";
     cfg.wordlist_path = "tests/data/small_wordlist.txt";
     cfg.thread_count = 2;
 

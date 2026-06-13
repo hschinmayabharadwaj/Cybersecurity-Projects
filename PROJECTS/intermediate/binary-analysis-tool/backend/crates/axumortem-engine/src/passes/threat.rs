@@ -68,9 +68,7 @@ use crate::pass::{AnalysisPass, Sealed};
 use crate::passes::entropy::EntropyResult;
 use crate::passes::imports::ImportResult;
 use crate::passes::strings::StringResult;
-use crate::types::{
-    EntropyFlag, RiskLevel, StringCategory,
-};
+use crate::types::{EntropyFlag, RiskLevel, StringCategory};
 use crate::yara::{YaraMatch, YaraScanner};
 
 const IMPORT_MAX: u32 = 20;
@@ -147,12 +145,10 @@ const HIGH_MAX: u32 = 75;
 const SUMMARY_TOP_N: usize = 5;
 
 const SUSPICIOUS_TLDS: &[&str] = &[
-    ".ru", ".cn", ".tk", ".pw", ".cc", ".top",
-    ".xyz", ".buzz", ".onion",
+    ".ru", ".cn", ".tk", ".pw", ".cc", ".top", ".xyz", ".buzz", ".onion",
 ];
 
-const BASE64_MZ_PREFIXES: &[&str] =
-    &["TVqQ", "TVpQ", "TVoA", "TVpB"];
+const BASE64_MZ_PREFIXES: &[&str] = &["TVqQ", "TVpQ", "TVoA", "TVpB"];
 
 const TIMING_CHECK_FUNCTIONS: &[&str] = &[
     "GetTickCount64",
@@ -161,15 +157,9 @@ const TIMING_CHECK_FUNCTIONS: &[&str] = &[
     "rdtsc",
 ];
 
-const VM_STRINGS: &[&str] = &[
-    "vmware", "virtualbox", "vbox", "qemu",
-    "hyper-v", "xen",
-];
+const VM_STRINGS: &[&str] = &["vmware", "virtualbox", "vbox", "qemu", "hyper-v", "xen"];
 
-const SANDBOX_STRINGS: &[&str] = &[
-    "sandbox", "cuckoo", "wireshark", "procmon",
-    "sandboxie",
-];
+const SANDBOX_STRINGS: &[&str] = &["sandbox", "cuckoo", "wireshark", "procmon", "sandboxie"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThreatResult {
@@ -214,25 +204,17 @@ impl AnalysisPass for ThreatPass {
     }
 
     fn dependencies(&self) -> &[&'static str] {
-        &[
-            "format", "imports", "strings",
-            "entropy", "disasm",
-        ]
+        &["format", "imports", "strings", "entropy", "disasm"]
     }
 
-    fn run(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> Result<(), EngineError> {
+    fn run(&self, ctx: &mut AnalysisContext) -> Result<(), EngineError> {
         let yara_scanner = YaraScanner::new()?;
-        let yara_matches =
-            yara_scanner.scan(ctx.data())?;
+        let yara_matches = yara_scanner.scan(ctx.data())?;
 
         let format_result = ctx.format_result.as_ref();
         let import_result = ctx.import_result.as_ref();
         let string_result = ctx.string_result.as_ref();
-        let entropy_result =
-            ctx.entropy_result.as_ref();
+        let entropy_result = ctx.entropy_result.as_ref();
 
         let result = compute_threat_score(
             format_result,
@@ -253,21 +235,13 @@ pub fn compute_threat_score(
     entropy_result: Option<&EntropyResult>,
     yara_matches: &[YaraMatch],
 ) -> ThreatResult {
-    let cat_import =
-        score_imports(import_result, string_result);
+    let cat_import = score_imports(import_result, string_result);
     let cat_entropy = score_entropy(entropy_result);
-    let cat_packing = score_packing(
-        entropy_result,
-        format_result,
-        string_result,
-    );
+    let cat_packing = score_packing(entropy_result, format_result, string_result);
     let cat_strings = score_strings(string_result);
     let cat_sections = score_sections(format_result);
     let cat_ep = score_entry_point(format_result);
-    let cat_anti = score_anti_analysis(
-        import_result,
-        string_result,
-    );
+    let cat_anti = score_anti_analysis(import_result, string_result);
     let cat_yara = score_yara(yara_matches);
 
     let categories = vec![
@@ -281,10 +255,7 @@ pub fn compute_threat_score(
         cat_yara,
     ];
 
-    let total_score: u32 = categories
-        .iter()
-        .map(|c| c.score.min(c.max_score))
-        .sum();
+    let total_score: u32 = categories.iter().map(|c| c.score.min(c.max_score)).sum();
 
     let risk_level = classify_risk(total_score);
 
@@ -293,26 +264,16 @@ pub fn compute_threat_score(
         for combo in &ir.suspicious_combinations {
             if !combo.mitre_id.is_empty() {
                 mitre_techniques.push(MitreMapping {
-                    technique_id: combo
-                        .mitre_id
-                        .clone(),
-                    technique_name: combo
-                        .name
-                        .clone(),
-                    tactic: combo
-                        .description
-                        .clone(),
-                    evidence: combo
-                        .apis
-                        .join(" + "),
+                    technique_id: combo.mitre_id.clone(),
+                    technique_name: combo.name.clone(),
+                    tactic: combo.description.clone(),
+                    evidence: combo.apis.join(" + "),
                 });
             }
         }
         for mapping in &ir.mitre_mappings {
             mitre_techniques.push(MitreMapping {
-                technique_id: mapping
-                    .technique_id
-                    .clone(),
+                technique_id: mapping.technique_id.clone(),
                 technique_name: mapping.tag.clone(),
                 tactic: mapping.tag.clone(),
                 evidence: mapping.api.clone(),
@@ -321,15 +282,9 @@ pub fn compute_threat_score(
     }
 
     let mut seen_techniques = HashSet::new();
-    mitre_techniques.retain(|t| {
-        seen_techniques.insert(t.technique_id.clone())
-    });
+    mitre_techniques.retain(|t| seen_techniques.insert(t.technique_id.clone()));
 
-    let summary = generate_summary(
-        &categories,
-        total_score,
-        &risk_level,
-    );
+    let summary = generate_summary(&categories, total_score, &risk_level);
 
     ThreatResult {
         total_score,
@@ -361,79 +316,39 @@ fn score_imports(
     if let Some(ir) = import_result {
         for combo in &ir.suspicious_combinations {
             let points = match combo.name.as_str() {
-                "Process Injection Chain" => {
-                    INJECTION_CHAIN
-                }
-                "Process Hollowing" => {
-                    HOLLOWING_CHAIN
-                }
-                "Credential Theft" => {
-                    CREDENTIAL_ACCESS
-                }
+                "Process Injection Chain" => INJECTION_CHAIN,
+                "Process Hollowing" => HOLLOWING_CHAIN,
+                "Credential Theft" => CREDENTIAL_ACCESS,
                 "APC Injection" => APC_INJECTION,
                 "DLL Injection" => ANTI_DEBUG_API,
-                "Download and Execute"
-                | "Download and Execute (WinInet)" => {
-                    NETWORK_DOWNLOAD
-                }
-                "Registry Persistence" => {
-                    REGISTRY_RUN_KEYS
-                }
-                "Service Persistence" => {
-                    REGISTRY_RUN_KEYS
-                }
-                "Linux ptrace Injection" => {
-                    LINUX_PTRACE
-                }
-                "Linux RWX Memory" => {
-                    LINUX_RWX_MEMORY
-                }
-                "Linux C2 Connection" => {
-                    LINUX_C2_CONNECTION
-                }
-                "Linux Network Listener" => {
-                    LINUX_NETWORK_LISTENER
-                }
-                "Linux Dynamic Loading" => {
-                    LINUX_DYNAMIC_LOADING
-                }
-                "Linux Process Injection" => {
-                    LINUX_PROCESS_INJECTION
-                }
+                "Download and Execute" | "Download and Execute (WinInet)" => NETWORK_DOWNLOAD,
+                "Registry Persistence" => REGISTRY_RUN_KEYS,
+                "Service Persistence" => REGISTRY_RUN_KEYS,
+                "Linux ptrace Injection" => LINUX_PTRACE,
+                "Linux RWX Memory" => LINUX_RWX_MEMORY,
+                "Linux C2 Connection" => LINUX_C2_CONNECTION,
+                "Linux Network Listener" => LINUX_NETWORK_LISTENER,
+                "Linux Dynamic Loading" => LINUX_DYNAMIC_LOADING,
+                "Linux Process Injection" => LINUX_PROCESS_INJECTION,
                 _ => 3,
             };
             details.push(ScoringDetail {
-                rule: format!(
-                    "{} detected",
-                    combo.name
-                ),
+                rule: format!("{} detected", combo.name),
                 points,
-                evidence: combo
-                    .apis
-                    .join(" + "),
+                evidence: combo.apis.join(" + "),
             });
             raw += points;
         }
 
         for imp in &ir.imports {
-            if imp.is_suspicious
-                && imp
-                    .threat_tags
-                    .iter()
-                    .any(|t| t == "anti-debug")
-            {
-                let pts = if imp.function
-                    == "NtQueryInformationProcess"
-                {
+            if imp.is_suspicious && imp.threat_tags.iter().any(|t| t == "anti-debug") {
+                let pts = if imp.function == "NtQueryInformationProcess" {
                     ANTI_DEBUG_API
                 } else {
                     3
                 };
                 details.push(ScoringDetail {
-                    rule: format!(
-                        "Anti-debug API: {}",
-                        imp.function
-                    ),
+                    rule: format!("Anti-debug API: {}", imp.function),
                     points: pts,
                     evidence: imp.function.clone(),
                 });
@@ -441,17 +356,11 @@ fn score_imports(
             }
         }
 
-        if ir.statistics.total_imports
-            < FEW_IMPORTS_THRESHOLD
-            && ir.statistics.total_imports > 0
-        {
+        if ir.statistics.total_imports < FEW_IMPORTS_THRESHOLD && ir.statistics.total_imports > 0 {
             details.push(ScoringDetail {
                 rule: "Very few imports".into(),
                 points: VERY_FEW_IMPORTS,
-                evidence: format!(
-                    "{} imports",
-                    ir.statistics.total_imports
-                ),
+                evidence: format!("{} imports", ir.statistics.total_imports),
             });
             raw += VERY_FEW_IMPORTS;
         }
@@ -459,30 +368,21 @@ fn score_imports(
 
     if let Some(sr) = string_result {
         let import_names: HashSet<&str> = import_result
-            .map(|ir| {
-                ir.imports
-                    .iter()
-                    .map(|i| i.function.as_str())
-                    .collect()
-            })
+            .map(|ir| ir.imports.iter().map(|i| i.function.as_str()).collect())
             .unwrap_or_default();
         let string_only_apis = sr
             .strings
             .iter()
             .filter(|s| {
-                s.category
-                    == StringCategory::SuspiciousApi
-                    && !import_names
-                        .contains(s.value.as_str())
+                s.category == StringCategory::SuspiciousApi
+                    && !import_names.contains(s.value.as_str())
             })
             .count();
         if string_only_apis > 0 {
             details.push(ScoringDetail {
                 rule: "Suspicious API strings (not imported)".into(),
                 points: 3,
-                evidence: format!(
-                    "{string_only_apis} API names found in strings only"
-                ),
+                evidence: format!("{string_only_apis} API names found in strings only"),
             });
             raw += 3;
         }
@@ -496,45 +396,29 @@ fn score_imports(
     }
 }
 
-fn score_entropy(
-    entropy_result: Option<&EntropyResult>,
-) -> ScoringCategory {
+fn score_entropy(entropy_result: Option<&EntropyResult>) -> ScoringCategory {
     let mut details = Vec::new();
     let mut raw = 0u32;
 
     if let Some(er) = entropy_result {
         let mut high_count = 0u32;
         for section in &er.sections {
-            if section.entropy > HIGH_ENTROPY_THRESHOLD
-                && high_count < HIGH_SECTION_ENTROPY_CAP
-            {
+            if section.entropy > HIGH_ENTROPY_THRESHOLD && high_count < HIGH_SECTION_ENTROPY_CAP {
                 details.push(ScoringDetail {
-                    rule: format!(
-                        "High entropy section: {}",
-                        section.name
-                    ),
+                    rule: format!("High entropy section: {}", section.name),
                     points: HIGH_SECTION_ENTROPY,
-                    evidence: format!(
-                        "entropy={:.2}",
-                        section.entropy
-                    ),
+                    evidence: format!("entropy={:.2}", section.entropy),
                 });
                 raw += HIGH_SECTION_ENTROPY;
                 high_count += 1;
             }
         }
 
-        if er.overall_entropy
-            > VERY_HIGH_ENTROPY_THRESHOLD
-        {
+        if er.overall_entropy > VERY_HIGH_ENTROPY_THRESHOLD {
             details.push(ScoringDetail {
-                rule: "Very high overall entropy"
-                    .into(),
+                rule: "Very high overall entropy".into(),
                 points: VERY_HIGH_OVERALL_ENTROPY,
-                evidence: format!(
-                    "overall={:.2}",
-                    er.overall_entropy
-                ),
+                evidence: format!("overall={:.2}", er.overall_entropy),
             });
             raw += VERY_HIGH_OVERALL_ENTROPY;
         }
@@ -559,47 +443,33 @@ fn score_packing(
     if let Some(er) = entropy_result {
         let mut has_packer_section = false;
         for section in &er.sections {
-            if section
-                .flags
-                .contains(&EntropyFlag::PackerSectionName)
-            {
+            if section.flags.contains(&EntropyFlag::PackerSectionName) {
                 has_packer_section = true;
                 details.push(ScoringDetail {
-                    rule: "Known packer section name"
-                        .into(),
+                    rule: "Known packer section name".into(),
                     points: PACKER_SECTION_NAME,
                     evidence: section.name.clone(),
                 });
                 raw += PACKER_SECTION_NAME;
             }
-            if section
-                .flags
-                .contains(&EntropyFlag::EmptyRawData)
-            {
+            if section.flags.contains(&EntropyFlag::EmptyRawData) {
                 details.push(ScoringDetail {
-                    rule:
-                        "Empty raw with virtual size"
-                            .into(),
+                    rule: "Empty raw with virtual size".into(),
                     points: EMPTY_RAW_WITH_VIRTUAL,
                     evidence: format!(
                         "section={} virtual={}",
-                        section.name,
-                        section.virtual_to_raw_ratio
+                        section.name, section.virtual_to_raw_ratio
                     ),
                 });
                 raw += EMPTY_RAW_WITH_VIRTUAL;
             }
-            if section.flags.contains(
-                &EntropyFlag::HighVirtualToRawRatio,
-            ) {
+            if section.flags.contains(&EntropyFlag::HighVirtualToRawRatio) {
                 details.push(ScoringDetail {
-                    rule: "High virtual/raw ratio"
-                        .into(),
+                    rule: "High virtual/raw ratio".into(),
                     points: HIGH_VR_RATIO,
                     evidence: format!(
                         "section={} ratio={:.1}",
-                        section.name,
-                        section.virtual_to_raw_ratio
+                        section.name, section.virtual_to_raw_ratio
                     ),
                 });
                 raw += HIGH_VR_RATIO;
@@ -618,9 +488,7 @@ fn score_packing(
         let has_pushad = er
             .packing_indicators
             .iter()
-            .any(|pi| {
-                pi.indicator_type == "entry_point"
-            });
+            .any(|pi| pi.indicator_type == "entry_point");
         if has_pushad {
             details.push(ScoringDetail {
                 rule: "PUSHAD at entry point".into(),
@@ -633,20 +501,10 @@ fn score_packing(
         let has_upx_sections = er
             .packing_indicators
             .iter()
-            .any(|pi| {
-                pi.packer_name.as_deref()
-                    == Some("UPX")
-            });
-        let has_upx_magic = string_result
-            .map_or(false, |sr| {
-                sr.strings.iter().any(|s| {
-                    s.value.contains("UPX!")
-                })
-            });
-        if has_packer_section
-            && has_upx_sections
-            && !has_upx_magic
-        {
+            .any(|pi| pi.packer_name.as_deref() == Some("UPX"));
+        let has_upx_magic =
+            string_result.is_some_and(|sr| sr.strings.iter().any(|s| s.value.contains("UPX!")));
+        if has_packer_section && has_upx_sections && !has_upx_magic {
             details.push(ScoringDetail {
                 rule: "Modified UPX".into(),
                 points: MODIFIED_UPX,
@@ -657,19 +515,20 @@ fn score_packing(
     }
 
     if let Some(fr) = format_result {
-        let suspicious_section_count =
-            fr.sections.iter().filter(|s| {
+        let suspicious_section_count = fr
+            .sections
+            .iter()
+            .filter(|s| {
                 crate::formats::SUSPICIOUS_SECTION_NAMES
                     .iter()
                     .any(|&(sus, _)| s.name == sus)
-            }).count();
+            })
+            .count();
         if suspicious_section_count > 0 {
             details.push(ScoringDetail {
                 rule: "Suspicious section names".into(),
                 points: 3,
-                evidence: format!(
-                    "{suspicious_section_count} suspicious section names"
-                ),
+                evidence: format!("{suspicious_section_count} suspicious section names"),
             });
             raw += 3;
         }
@@ -683,31 +542,22 @@ fn score_packing(
     }
 }
 
-fn score_strings(
-    string_result: Option<&StringResult>,
-) -> ScoringCategory {
+fn score_strings(string_result: Option<&StringResult>) -> ScoringCategory {
     let mut details = Vec::new();
     let mut raw = 0u32;
 
     if let Some(sr) = string_result {
-        let has_suspicious_urls =
-            sr.strings.iter().any(|s| {
-                s.category == StringCategory::Url
-                    && SUSPICIOUS_TLDS.iter().any(
-                        |tld| {
-                            s.value
-                                .to_ascii_lowercase()
-                                .contains(tld)
-                        },
-                    )
-            });
+        let has_suspicious_urls = sr.strings.iter().any(|s| {
+            s.category == StringCategory::Url
+                && SUSPICIOUS_TLDS
+                    .iter()
+                    .any(|tld| s.value.to_ascii_lowercase().contains(tld))
+        });
         if has_suspicious_urls {
             details.push(ScoringDetail {
-                rule: "C2/malicious URL patterns"
-                    .into(),
+                rule: "C2/malicious URL patterns".into(),
                 points: C2_PATTERN,
-                evidence: "URL with suspicious TLD"
-                    .into(),
+                evidence: "URL with suspicious TLD".into(),
             });
             raw += C2_PATTERN;
         }
@@ -715,37 +565,27 @@ fn score_strings(
         let has_shell_commands = sr
             .strings
             .iter()
-            .any(|s| {
-                s.category == StringCategory::ShellCommand
-            });
+            .any(|s| s.category == StringCategory::ShellCommand);
         if has_shell_commands {
             details.push(ScoringDetail {
-                rule: "Suspicious shell commands"
-                    .into(),
+                rule: "Suspicious shell commands".into(),
                 points: SUSPICIOUS_COMMANDS,
-                evidence: "Shell command strings found"
-                    .into(),
+                evidence: "Shell command strings found".into(),
             });
             raw += SUSPICIOUS_COMMANDS;
         }
 
-        let has_base64_pe = sr.strings.iter().any(
-            |s| {
-                s.category == StringCategory::EncodedData
-                    && BASE64_MZ_PREFIXES.iter().any(
-                        |prefix| {
-                            s.value.starts_with(prefix)
-                        },
-                    )
-            },
-        );
+        let has_base64_pe = sr.strings.iter().any(|s| {
+            s.category == StringCategory::EncodedData
+                && BASE64_MZ_PREFIXES
+                    .iter()
+                    .any(|prefix| s.value.starts_with(prefix))
+        });
         if has_base64_pe {
             details.push(ScoringDetail {
-                rule: "Base64-encoded PE header"
-                    .into(),
+                rule: "Base64-encoded PE header".into(),
                 points: BASE64_PE_HEADER,
-                evidence: "TVqQ/TVpQ prefix in Base64"
-                    .into(),
+                evidence: "TVqQ/TVpQ prefix in Base64".into(),
             });
             raw += BASE64_PE_HEADER;
         }
@@ -753,18 +593,12 @@ fn score_strings(
         let has_reg_persistence = sr
             .strings
             .iter()
-            .any(|s| {
-                s.category
-                    == StringCategory::PersistencePath
-            });
+            .any(|s| s.category == StringCategory::PersistencePath);
         if has_reg_persistence {
             details.push(ScoringDetail {
-                rule: "Registry persistence paths"
-                    .into(),
+                rule: "Registry persistence paths".into(),
                 points: REGISTRY_PERSISTENCE,
-                evidence:
-                    "Run/RunOnce registry paths found"
-                        .into(),
+                evidence: "Run/RunOnce registry paths found".into(),
             });
             raw += REGISTRY_PERSISTENCE;
         }
@@ -772,16 +606,12 @@ fn score_strings(
         let has_crypto_wallets = sr
             .strings
             .iter()
-            .any(|s| {
-                s.category
-                    == StringCategory::CryptoWallet
-            });
+            .any(|s| s.category == StringCategory::CryptoWallet);
         if has_crypto_wallets {
             details.push(ScoringDetail {
                 rule: "Crypto wallet addresses".into(),
                 points: CRYPTO_WALLET,
-                evidence: "BTC/ETH address patterns"
-                    .into(),
+                evidence: "BTC/ETH address patterns".into(),
             });
             raw += CRYPTO_WALLET;
         }
@@ -795,76 +625,56 @@ fn score_strings(
     }
 }
 
-fn score_sections(
-    format_result: Option<&FormatResult>,
-) -> ScoringCategory {
+fn score_sections(format_result: Option<&FormatResult>) -> ScoringCategory {
     let mut details = Vec::new();
     let mut raw = 0u32;
 
     if let Some(fr) = format_result {
-        let has_rwx = fr.anomalies.iter().any(|a| {
-            matches!(
-                a,
-                FormatAnomaly::RwxSection { .. }
-            )
-        });
+        let has_rwx = fr
+            .anomalies
+            .iter()
+            .any(|a| matches!(a, FormatAnomaly::RwxSection { .. }));
         if has_rwx {
             details.push(ScoringDetail {
                 rule: "RWX section detected".into(),
                 points: RWX_SECTION,
-                evidence: "Read+Write+Execute section"
-                    .into(),
+                evidence: "Read+Write+Execute section".into(),
             });
             raw += RWX_SECTION;
         }
 
-        let has_empty_name =
-            fr.anomalies.iter().any(|a| {
-                matches!(
-                    a,
-                    FormatAnomaly::EmptySectionName {
-                        ..
-                    }
-                )
-            });
+        let has_empty_name = fr
+            .anomalies
+            .iter()
+            .any(|a| matches!(a, FormatAnomaly::EmptySectionName { .. }));
         if has_empty_name {
             details.push(ScoringDetail {
                 rule: "Empty/null section name".into(),
                 points: EMPTY_SECTION_NAME,
-                evidence:
-                    "Section with empty or null name"
-                        .into(),
+                evidence: "Section with empty or null name".into(),
             });
             raw += EMPTY_SECTION_NAME;
         }
 
         let section_count = fr.sections.len();
-        if section_count > MAX_NORMAL_SECTIONS
-            || section_count == 0
-        {
+        if section_count > MAX_NORMAL_SECTIONS || section_count == 0 {
             details.push(ScoringDetail {
                 rule: "Unusual section count".into(),
                 points: UNUSUAL_SECTION_COUNT,
-                evidence: format!(
-                    "{section_count} sections"
-                ),
+                evidence: format!("{section_count} sections"),
             });
             raw += UNUSUAL_SECTION_COUNT;
         }
 
-        let has_zero_code = fr.sections.iter().any(
-            |s| {
-                (s.name == ".text" || s.name == ".code")
-                    && s.raw_size == 0
-            },
-        );
+        let has_zero_code = fr
+            .sections
+            .iter()
+            .any(|s| (s.name == ".text" || s.name == ".code") && s.raw_size == 0);
         if has_zero_code {
             details.push(ScoringDetail {
                 rule: "Zero-size code section".into(),
                 points: ZERO_SIZE_CODE,
-                evidence:
-                    ".text/.code with raw_size == 0"
-                        .into(),
+                evidence: ".text/.code with raw_size == 0".into(),
             });
             raw += ZERO_SIZE_CODE;
         }
@@ -878,84 +688,62 @@ fn score_sections(
     }
 }
 
-fn score_entry_point(
-    format_result: Option<&FormatResult>,
-) -> ScoringCategory {
+fn score_entry_point(format_result: Option<&FormatResult>) -> ScoringCategory {
     let mut details = Vec::new();
     let mut raw = 0u32;
 
     if let Some(fr) = format_result {
         let ep = fr.entry_point;
 
-        let ep_section = fr.sections.iter().find(|s| {
-            ep >= s.virtual_address
-                && ep < s.virtual_address
-                    + s.virtual_size
-        });
+        let ep_section = fr
+            .sections
+            .iter()
+            .find(|s| ep >= s.virtual_address && ep < s.virtual_address + s.virtual_size);
 
         let in_text = fr.sections.iter().any(|s| {
-            s.name == ".text"
-                && ep >= s.virtual_address
-                && ep < s.virtual_address
-                    + s.virtual_size
+            s.name == ".text" && ep >= s.virtual_address && ep < s.virtual_address + s.virtual_size
         });
 
         if !in_text && ep_section.is_some() {
             details.push(ScoringDetail {
-                rule: "EP outside .text section"
-                    .into(),
+                rule: "EP outside .text section".into(),
                 points: EP_OUTSIDE_TEXT,
-                evidence: format!(
-                    "EP=0x{ep:x} not in .text"
-                ),
+                evidence: format!("EP=0x{ep:x} not in .text"),
             });
             raw += EP_OUTSIDE_TEXT;
         }
 
-        if ep_section.is_none() && !fr.sections.is_empty()
-        {
+        if ep_section.is_none() && !fr.sections.is_empty() {
             details.push(ScoringDetail {
                 rule: "EP outside all sections".into(),
                 points: EP_OUTSIDE_ALL,
-                evidence: format!(
-                    "EP=0x{ep:x} not in any section"
-                ),
+                evidence: format!("EP=0x{ep:x} not in any section"),
             });
             raw += EP_OUTSIDE_ALL;
         }
 
-        if let Some(last) = fr.sections.last() {
-            if ep >= last.virtual_address
-                && ep < last.virtual_address
-                    + last.virtual_size
-                && fr.sections.len() > 1
-            {
-                details.push(ScoringDetail {
-                    rule: "EP in last section".into(),
-                    points: EP_LAST_SECTION,
-                    evidence: format!(
-                        "EP=0x{ep:x} in last section '{}'",
-                        last.name
-                    ),
-                });
-                raw += EP_LAST_SECTION;
-            }
+        if let Some(last) = fr.sections.last()
+            && ep >= last.virtual_address
+            && ep < last.virtual_address + last.virtual_size
+            && fr.sections.len() > 1
+        {
+            details.push(ScoringDetail {
+                rule: "EP in last section".into(),
+                points: EP_LAST_SECTION,
+                evidence: format!("EP=0x{ep:x} in last section '{}'", last.name),
+            });
+            raw += EP_LAST_SECTION;
         }
 
-        let has_tls = fr.anomalies.iter().any(|a| {
-            matches!(
-                a,
-                FormatAnomaly::TlsCallbacksPresent {
-                    ..
-                }
-            )
-        });
+        let has_tls = fr
+            .anomalies
+            .iter()
+            .any(|a| matches!(a, FormatAnomaly::TlsCallbacksPresent { .. }));
         if has_tls {
             details.push(ScoringDetail {
                 rule: "TLS callbacks present".into(),
                 points: TLS_CALLBACKS,
-                evidence: "PE TLS callback entries"
-                    .into(),
+                evidence: "PE TLS callback entries".into(),
             });
             raw += TLS_CALLBACKS;
         }
@@ -976,13 +764,9 @@ fn score_anti_analysis(
     let mut details = Vec::new();
     let mut raw = 0u32;
 
-    let all_names = collect_api_and_string_names(
-        import_result,
-        string_result,
-    );
+    let all_names = collect_api_and_string_names(import_result, string_result);
 
-    if all_names.iter().any(|n| n == "IsDebuggerPresent")
-    {
+    if all_names.iter().any(|n| n == "IsDebuggerPresent") {
         details.push(ScoringDetail {
             rule: "IsDebuggerPresent detected".into(),
             points: IS_DEBUGGER_PRESENT,
@@ -991,16 +775,11 @@ fn score_anti_analysis(
         raw += IS_DEBUGGER_PRESENT;
     }
 
-    if all_names
-        .iter()
-        .any(|n| n == "NtQueryInformationProcess")
-    {
+    if all_names.iter().any(|n| n == "NtQueryInformationProcess") {
         details.push(ScoringDetail {
-            rule: "NtQueryInformationProcess detected"
-                .into(),
+            rule: "NtQueryInformationProcess detected".into(),
             points: NT_QUERY_INFO_PROCESS,
-            evidence: "NtQueryInformationProcess"
-                .into(),
+            evidence: "NtQueryInformationProcess".into(),
         });
         raw += NT_QUERY_INFO_PROCESS;
     }
@@ -1008,83 +787,60 @@ fn score_anti_analysis(
     if let Some(sr) = string_result {
         let has_vm = sr.strings.iter().any(|s| {
             let lower = s.value.to_ascii_lowercase();
-            VM_STRINGS
-                .iter()
-                .any(|vm| lower.contains(vm))
+            VM_STRINGS.iter().any(|vm| lower.contains(vm))
         });
         if has_vm {
             details.push(ScoringDetail {
                 rule: "VM detection strings".into(),
                 points: VM_DETECTION_STRINGS,
-                evidence:
-                    "VMware/VBox/QEMU/Hyper-V strings"
-                        .into(),
+                evidence: "VMware/VBox/QEMU/Hyper-V strings".into(),
             });
             raw += VM_DETECTION_STRINGS;
         }
 
         let has_sandbox = sr.strings.iter().any(|s| {
             let lower = s.value.to_ascii_lowercase();
-            SANDBOX_STRINGS
-                .iter()
-                .any(|sb| lower.contains(sb))
+            SANDBOX_STRINGS.iter().any(|sb| lower.contains(sb))
         });
         if has_sandbox {
             details.push(ScoringDetail {
                 rule: "Sandbox evasion strings".into(),
                 points: SANDBOX_EVASION,
-                evidence:
-                    "sandbox/cuckoo/wireshark strings"
-                        .into(),
+                evidence: "sandbox/cuckoo/wireshark strings".into(),
             });
             raw += SANDBOX_EVASION;
         }
 
-        let has_linux_anti_debug =
-            sr.strings.iter().any(|s| {
-                s.category
-                    == StringCategory::AntiAnalysis
-                    && s.value.contains("TracerPid")
-            });
+        let has_linux_anti_debug = sr
+            .strings
+            .iter()
+            .any(|s| s.category == StringCategory::AntiAnalysis && s.value.contains("TracerPid"));
         if has_linux_anti_debug {
             details.push(ScoringDetail {
-                rule: "Linux ptrace anti-debug"
-                    .into(),
+                rule: "Linux ptrace anti-debug".into(),
                 points: LINUX_PTRACE_CHECK,
-                evidence:
-                    "TracerPid check detected"
-                        .into(),
+                evidence: "TracerPid check detected".into(),
             });
             raw += LINUX_PTRACE_CHECK;
         }
 
-        let has_proc_analysis =
-            sr.strings.iter().any(|s| {
-                s.category
-                    == StringCategory::AntiAnalysis
-                    && (s.value
-                        .contains("/proc/self/maps")
-                        || s.value.contains(
-                            "/proc/self/status",
-                        ))
-            });
+        let has_proc_analysis = sr.strings.iter().any(|s| {
+            s.category == StringCategory::AntiAnalysis
+                && (s.value.contains("/proc/self/maps") || s.value.contains("/proc/self/status"))
+        });
         if has_proc_analysis {
             details.push(ScoringDetail {
                 rule: "/proc/self analysis".into(),
                 points: PROC_SELF_ANALYSIS,
-                evidence:
-                    "Process self-inspection detected"
-                        .into(),
+                evidence: "Process self-inspection detected".into(),
             });
             raw += PROC_SELF_ANALYSIS;
         }
     }
 
-    let has_timing = all_names.iter().any(|n| {
-        TIMING_CHECK_FUNCTIONS
-            .iter()
-            .any(|t| n.contains(t))
-    });
+    let has_timing = all_names
+        .iter()
+        .any(|n| TIMING_CHECK_FUNCTIONS.iter().any(|t| n.contains(t)));
     if has_timing {
         details.push(ScoringDetail {
             rule: "Timing check APIs".into(),
@@ -1102,49 +858,28 @@ fn score_anti_analysis(
     }
 }
 
-fn score_yara(
-    yara_matches: &[YaraMatch],
-) -> ScoringCategory {
+fn score_yara(yara_matches: &[YaraMatch]) -> ScoringCategory {
     let mut details = Vec::new();
     let mut raw = 0u32;
 
     for ym in yara_matches {
-        let category = ym
-            .metadata
-            .category
-            .as_deref()
-            .unwrap_or("");
-        let severity = ym
-            .metadata
-            .severity
-            .as_deref()
-            .unwrap_or("");
+        let category = ym.metadata.category.as_deref().unwrap_or("");
+        let severity = ym.metadata.severity.as_deref().unwrap_or("");
 
-        let points = if category == "malware"
-            || severity == "critical"
-        {
+        let points = if category == "malware" || severity == "critical" {
             YARA_MALWARE_FAMILY
         } else if category == "packer" {
             YARA_PACKER_RULE
-        } else if category == "c2"
-            || category == "credential-access"
-        {
+        } else if category == "c2" || category == "credential-access" {
             YARA_SUSPICIOUS + 2
         } else {
             YARA_SUSPICIOUS
         };
 
         details.push(ScoringDetail {
-            rule: format!(
-                "YARA: {}",
-                ym.rule_name
-            ),
+            rule: format!("YARA: {}", ym.rule_name),
             points,
-            evidence: ym
-                .metadata
-                .description
-                .clone()
-                .unwrap_or_default(),
+            evidence: ym.metadata.description.clone().unwrap_or_default(),
         });
         raw += points;
     }
@@ -1169,9 +904,7 @@ fn collect_api_and_string_names(
     }
     if let Some(sr) = string_result {
         for s in &sr.strings {
-            if s.category
-                == StringCategory::SuspiciousApi
-            {
+            if s.category == StringCategory::SuspiciousApi {
                 names.push(s.value.clone());
             }
         }
@@ -1184,16 +917,13 @@ fn generate_summary(
     total_score: u32,
     risk_level: &RiskLevel,
 ) -> String {
-    let mut all_details: Vec<(&str, &ScoringDetail)> =
-        Vec::new();
+    let mut all_details: Vec<(&str, &ScoringDetail)> = Vec::new();
     for cat in categories {
         for detail in &cat.details {
-            all_details
-                .push((&cat.name, detail));
+            all_details.push((&cat.name, detail));
         }
     }
-    all_details
-        .sort_by(|a, b| b.1.points.cmp(&a.1.points));
+    all_details.sort_by(|a, b| b.1.points.cmp(&a.1.points));
 
     let top: Vec<String> = all_details
         .iter()
@@ -1221,30 +951,15 @@ mod tests {
     #[test]
     fn risk_level_classification() {
         assert_eq!(classify_risk(0), RiskLevel::Benign);
-        assert_eq!(
-            classify_risk(15),
-            RiskLevel::Benign
-        );
+        assert_eq!(classify_risk(15), RiskLevel::Benign);
         assert_eq!(classify_risk(16), RiskLevel::Low);
         assert_eq!(classify_risk(35), RiskLevel::Low);
-        assert_eq!(
-            classify_risk(36),
-            RiskLevel::Medium
-        );
-        assert_eq!(
-            classify_risk(55),
-            RiskLevel::Medium
-        );
+        assert_eq!(classify_risk(36), RiskLevel::Medium);
+        assert_eq!(classify_risk(55), RiskLevel::Medium);
         assert_eq!(classify_risk(56), RiskLevel::High);
         assert_eq!(classify_risk(75), RiskLevel::High);
-        assert_eq!(
-            classify_risk(76),
-            RiskLevel::Critical
-        );
-        assert_eq!(
-            classify_risk(100),
-            RiskLevel::Critical
-        );
+        assert_eq!(classify_risk(76), RiskLevel::Critical);
+        assert_eq!(classify_risk(100), RiskLevel::Critical);
     }
 
     #[test]
@@ -1260,21 +975,14 @@ mod tests {
 
     #[test]
     fn total_is_sum_of_capped() {
-        let result = compute_threat_score(
-            None, None, None, None, &[],
-        );
+        let result = compute_threat_score(None, None, None, None, &[]);
         assert_eq!(result.total_score, 0);
-        assert_eq!(
-            result.risk_level,
-            RiskLevel::Benign
-        );
+        assert_eq!(result.risk_level, RiskLevel::Benign);
     }
 
     #[test]
     fn summary_empty_when_no_threats() {
-        let result = compute_threat_score(
-            None, None, None, None, &[],
-        );
+        let result = compute_threat_score(None, None, None, None, &[]);
         assert!(result.summary.contains("BENIGN"));
         assert!(result.summary.contains("0/100"));
     }
@@ -1285,9 +993,7 @@ mod tests {
             rule_name: "test_malware".into(),
             tags: Vec::new(),
             metadata: crate::yara::YaraMetadata {
-                description: Some(
-                    "Test malware rule".into(),
-                ),
+                description: Some("Test malware rule".into()),
                 category: Some("malware".into()),
                 severity: Some("critical".into()),
             },
@@ -1303,9 +1009,7 @@ mod tests {
             rule_name: "test_packer".into(),
             tags: Vec::new(),
             metadata: crate::yara::YaraMetadata {
-                description: Some(
-                    "Test packer rule".into(),
-                ),
+                description: Some("Test packer rule".into()),
                 category: Some("packer".into()),
                 severity: Some("medium".into()),
             },
@@ -1317,9 +1021,7 @@ mod tests {
 
     #[test]
     fn entropy_scoring() {
-        use crate::passes::entropy::{
-            EntropyResult, SectionEntropy,
-        };
+        use crate::passes::entropy::{EntropyResult, SectionEntropy};
         use crate::types::EntropyClassification;
 
         let er = EntropyResult {
@@ -1328,8 +1030,7 @@ mod tests {
                 name: ".text".into(),
                 entropy: 7.5,
                 size: 4096,
-                classification:
-                    EntropyClassification::Encrypted,
+                classification: EntropyClassification::Encrypted,
                 virtual_to_raw_ratio: 1.0,
                 is_anomalous: true,
                 flags: vec![EntropyFlag::HighEntropy],
@@ -1339,22 +1040,14 @@ mod tests {
             packing_indicators: Vec::new(),
         };
         let cat = score_entropy(Some(&er));
-        assert!(
-            cat.score > 0,
-            "should score for high entropy"
-        );
+        assert!(cat.score > 0, "should score for high entropy");
         assert!(cat.details.len() >= 2);
     }
 
     #[test]
     fn section_rwx_scoring() {
-        use crate::formats::{
-            FormatResult, SectionInfo,
-        };
-        use crate::types::{
-            Architecture, BinaryFormat, Endianness,
-            SectionPermissions,
-        };
+        use crate::formats::{FormatResult, SectionInfo};
+        use crate::types::{Architecture, BinaryFormat, Endianness, SectionPermissions};
 
         let fr = FormatResult {
             format: BinaryFormat::Elf,
@@ -1379,11 +1072,9 @@ mod tests {
                 sha256: String::new(),
             }],
             segments: Vec::new(),
-            anomalies: vec![
-                FormatAnomaly::RwxSection {
-                    name: ".text".into(),
-                },
-            ],
+            anomalies: vec![FormatAnomaly::RwxSection {
+                name: ".text".into(),
+            }],
             pe_info: None,
             elf_info: None,
             macho_info: None,
@@ -1395,17 +1086,12 @@ mod tests {
 
     #[test]
     fn threat_pass_populates_context() {
-        use std::sync::Arc;
         use crate::context::BinarySource;
+        use std::sync::Arc;
 
         fn load_fixture(name: &str) -> Vec<u8> {
-            let path = format!(
-                "{}/tests/fixtures/{name}",
-                env!("CARGO_MANIFEST_DIR"),
-            );
-            std::fs::read(&path).unwrap_or_else(
-                |e| panic!("fixture {path}: {e}"),
-            )
+            let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+            std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
         }
 
         let data = load_fixture("hello_elf");
@@ -1417,21 +1103,11 @@ mod tests {
             size,
         );
 
-        crate::passes::format::FormatPass
-            .run(&mut ctx)
-            .unwrap();
-        crate::passes::imports::ImportPass
-            .run(&mut ctx)
-            .unwrap();
-        crate::passes::strings::StringPass
-            .run(&mut ctx)
-            .unwrap();
-        crate::passes::entropy::EntropyPass
-            .run(&mut ctx)
-            .unwrap();
-        crate::passes::disasm::DisasmPass
-            .run(&mut ctx)
-            .unwrap();
+        crate::passes::format::FormatPass.run(&mut ctx).unwrap();
+        crate::passes::imports::ImportPass.run(&mut ctx).unwrap();
+        crate::passes::strings::StringPass.run(&mut ctx).unwrap();
+        crate::passes::entropy::EntropyPass.run(&mut ctx).unwrap();
+        crate::passes::disasm::DisasmPass.run(&mut ctx).unwrap();
 
         assert!(ctx.threat_result.is_none());
         ThreatPass.run(&mut ctx).unwrap();

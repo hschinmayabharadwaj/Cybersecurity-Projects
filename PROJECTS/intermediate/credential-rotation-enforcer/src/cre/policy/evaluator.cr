@@ -54,7 +54,7 @@ module CRE::Policy
       return if @policies.empty?
 
       seen = Set(UUID).new
-      @policies.group_by(&.max_age).each do |max_age, policies_with_age|
+      @policies.group_by(&.max_age).each do |max_age, _|
         @persistence.credentials.overdue(now, max_age).each do |c|
           next if seen.includes?(c.id)
           seen << c.id

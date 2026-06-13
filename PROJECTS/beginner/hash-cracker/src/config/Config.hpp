@@ -70,7 +70,7 @@ constexpr std::string_view CYAN = "\033[36m";
 constexpr std::string_view BOLD = "\033[1m";
 constexpr std::string_view DIM = "\033[2m";
 
-}
+} // namespace color
 
 namespace box {
 
@@ -85,7 +85,7 @@ constexpr std::string_view BLOCK_EMPTY = "\u2591";
 constexpr std::string_view BAR_LEFT = "\u2590";
 constexpr std::string_view BAR_RIGHT = "\u258C";
 
-}
+} // namespace box
 
 namespace symbol {
 
@@ -99,9 +99,9 @@ constexpr std::string_view TRIANGLE_UP = "\u25B2";
 constexpr std::string_view STAR = "\u2726";
 constexpr std::string_view DIVIDER_CHAR = "\u2501";
 
-}
+} // namespace symbol
 
-}
+} // namespace config
 
 struct CrackConfig {
     std::string target_hash;

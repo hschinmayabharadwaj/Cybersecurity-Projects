@@ -47,15 +47,15 @@ std::expected<MappedFile, CrackError> MappedFile::open(std::string_view path) {
         return std::unexpected(CrackError::InvalidConfig);
     }
 
-    auto* mapped = static_cast<const char*>(
-        mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0));
+    auto *mapped =
+        static_cast<const char *>(mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0));
 
     if (mapped == MAP_FAILED) {
         ::close(fd);
         return std::unexpected(CrackError::FileNotFound);
     }
 
-    madvise(const_cast<char*>(mapped), file_size, MADV_SEQUENTIAL);
+    madvise(const_cast<char *>(mapped), file_size, MADV_SEQUENTIAL);
 
     MappedFile mf;
     mf.data_ = mapped;
@@ -66,23 +66,23 @@ std::expected<MappedFile, CrackError> MappedFile::open(std::string_view path) {
 
 MappedFile::~MappedFile() {
     if (data_ && data_ != MAP_FAILED) {
-        munmap(const_cast<char*>(data_), size_);
+        munmap(const_cast<char *>(data_), size_);
     }
     if (fd_ >= 0) {
         ::close(fd_);
     }
 }
 
-MappedFile::MappedFile(MappedFile&& other) noexcept
+MappedFile::MappedFile(MappedFile &&other) noexcept
     : data_(other.data_), size_(other.size_), fd_(other.fd_) {
     other.data_ = nullptr;
     other.fd_ = -1;
 }
 
-MappedFile& MappedFile::operator=(MappedFile&& other) noexcept {
+MappedFile &MappedFile::operator=(MappedFile &&other) noexcept {
     if (this != &other) {
         if (data_ && data_ != MAP_FAILED) {
-            munmap(const_cast<char*>(data_), size_);
+            munmap(const_cast<char *>(data_), size_);
         }
         if (fd_ >= 0) {
             ::close(fd_);

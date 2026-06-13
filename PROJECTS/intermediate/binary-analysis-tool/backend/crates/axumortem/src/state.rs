@@ -24,5 +24,6 @@ use crate::config::AppConfig;
 pub struct AppState {
     pub db: PgPool,
     pub engine: Arc<AnalysisEngine>,
+    #[allow(dead_code)]
     pub config: Arc<AppConfig>,
 }

@@ -1,0 +1,169 @@
+// ===================
+// ©AngelaMos | 2026
+// _tokens.scss
+// ===================
+
+// ============================================================================
+// COLOR — specimen palette
+// ============================================================================
+$paper: #f1ede4;
+$paper-deep: #ebe5d6;
+$paper-edge: #d9d1bd;
+
+$ink: #14110b;
+$ink-soft: #46402f;
+$ink-mute: #837a64;
+$ink-faint: #b8ad95;
+
+$rule: #1f1b13;
+$rule-soft: #a39879;
+$rule-hair: #d6cdb6;
+
+$alarm: #c4341c;
+$alarm-deep: #8c2210;
+$alarm-tint: #f3d8d0;
+
+$signal: #2b6b3a;
+$signal-tint: #d8e5d6;
+
+// ============================================================================
+// PAPER GRAIN (svg noise, data-uri — overlay at low opacity)
+// ============================================================================
+$paper-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.07  0 0 0 0 0.05  0 0 0 0.35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+
+// ============================================================================
+// HALFTONE DOT FIELD (svg, repeats — for separators / tonal patches)
+// ============================================================================
+$halftone-dots: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='1' cy='1' r='1' fill='%2314110b'/></svg>");
+
+// ============================================================================
+// HAIRLINE (the thin printed rule)
+// ============================================================================
+$hairline: 1px;
+$hairline-bold: 2px;
+
+// ============================================================================
+// SPACING (8px base system)
+// ============================================================================
+$space-0: 0;
+$space-px: 1px;
+$space-0-5: 0.125rem;
+$space-1: 0.25rem;
+$space-1-5: 0.375rem;
+$space-2: 0.5rem;
+$space-2-5: 0.625rem;
+$space-3: 0.75rem;
+$space-3-5: 0.875rem;
+$space-4: 1rem;
+$space-5: 1.25rem;
+$space-6: 1.5rem;
+$space-7: 1.75rem;
+$space-8: 2rem;
+$space-9: 2.25rem;
+$space-10: 2.5rem;
+$space-11: 2.75rem;
+$space-12: 3rem;
+$space-14: 3.5rem;
+$space-16: 4rem;
+$space-20: 5rem;
+$space-24: 6rem;
+$space-28: 7rem;
+$space-32: 8rem;
+
+// ============================================================================
+// TYPOGRAPHY SCALE
+// ============================================================================
+$font-size-3xs: 0.625rem;
+$font-size-2xs: 0.6875rem;
+$font-size-xs: 0.75rem;
+$font-size-sm: 0.875rem;
+$font-size-base: 1rem;
+$font-size-lg: 1.125rem;
+$font-size-xl: 1.25rem;
+$font-size-2xl: 1.5rem;
+$font-size-3xl: 1.875rem;
+$font-size-4xl: 2.25rem;
+$font-size-5xl: 3rem;
+
+// ============================================================================
+// FONT WEIGHTS
+// ============================================================================
+$font-weight-regular: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+
+// ============================================================================
+// LINE HEIGHTS
+// ============================================================================
+$line-height-none: 1;
+$line-height-tight: 1.2;
+$line-height-snug: 1.375;
+$line-height-normal: 1.5;
+$line-height-relaxed: 1.625;
+
+// ============================================================================
+// LETTER SPACING
+// ============================================================================
+$tracking-tighter: -0.05em;
+$tracking-tight: -0.025em;
+$tracking-normal: 0;
+$tracking-wide: 0.025em;
+$tracking-wider: 0.05em;
+
+// ============================================================================
+// BORDER RADIUS
+// ============================================================================
+$radius-none: 0;
+$radius-xs: 2px;
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 8px;
+$radius-xl: 12px;
+$radius-full: 9999px;
+
+// ============================================================================
+// Z-INDEX SCALE
+// ============================================================================
+$z-hide: -1;
+$z-base: 0;
+$z-dropdown: 100;
+$z-sticky: 200;
+$z-fixed: 300;
+$z-overlay: 400;
+$z-modal: 500;
+$z-popover: 600;
+$z-tooltip: 700;
+$z-toast: 800;
+$z-max: 9999;
+
+// ============================================================================
+// TRANSITIONS
+// ============================================================================
+$duration-instant: 0ms;
+$duration-fast: 100ms;
+$duration-normal: 150ms;
+$duration-slow: 200ms;
+
+$ease-out: cubic-bezier(0, 0, 0.2, 1);
+$ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+// ============================================================================
+// BREAKPOINTS
+// ============================================================================
+$breakpoint-xs: 360px;
+$breakpoint-sm: 480px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+$breakpoint-2xl: 1536px;
+
+// ============================================================================
+// CONTAINER WIDTHS
+// ============================================================================
+$container-xs: 20rem;
+$container-sm: 24rem;
+$container-md: 28rem;
+$container-lg: 32rem;
+$container-xl: 36rem;
+$container-2xl: 42rem;
+$container-full: 100%;

@@ -16,20 +16,19 @@ Connects to:
   hash/EVPHasher.hpp    - underlying implementation
 */
 
-#include <gtest/gtest.h>
 #include "src/hash/MD5Hasher.hpp"
 #include "src/hash/SHA1Hasher.hpp"
 #include "src/hash/SHA256Hasher.hpp"
 #include "src/hash/SHA512Hasher.hpp"
+#include <gtest/gtest.h>
 
 TEST(SHA256HasherTest, KnownVectors) {
     SHA256Hasher hasher;
-    EXPECT_EQ(hasher.hash(""),
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    EXPECT_EQ(hasher.hash(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     EXPECT_EQ(hasher.hash("password"),
-        "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8");
+              "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8");
     EXPECT_EQ(hasher.hash("hello"),
-        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+              "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
 }
 
 TEST(SHA256HasherTest, StaticProperties) {
@@ -68,12 +67,11 @@ TEST(SHA1HasherTest, StaticProperties) {
 
 TEST(SHA512HasherTest, KnownVectors) {
     SHA512Hasher hasher;
-    EXPECT_EQ(hasher.hash(""),
-        "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce"
-        "47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");
+    EXPECT_EQ(hasher.hash(""), "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce"
+                               "47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");
     EXPECT_EQ(hasher.hash("password"),
-        "b109f3bbbc244eb82441917ed06d618b9008dd09b3befd1b5e07394c706a8bb9"
-        "80b1d7785e5976ec049b46df5f1326af5a2ea6d103fd07c95385ffab0cacbc86");
+              "b109f3bbbc244eb82441917ed06d618b9008dd09b3befd1b5e07394c706a8bb9"
+              "80b1d7785e5976ec049b46df5f1326af5a2ea6d103fd07c95385ffab0cacbc86");
 }
 
 TEST(SHA512HasherTest, StaticProperties) {

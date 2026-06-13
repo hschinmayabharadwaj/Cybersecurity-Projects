@@ -109,6 +109,7 @@ export function Component(): React.ReactElement {
           width="100%"
           height="100%"
           preserveAspectRatio="none"
+          aria-hidden="true"
         >
           <filter id="grain-bat">
             <feTurbulence
@@ -248,7 +249,9 @@ export function Component(): React.ReactElement {
 
       <footer className={styles.footer}>
         <span>&copy; ANGELAMOS 2026</span>
-        <span className={styles.footerDesignation}>SYS AXM-BDE // UNIT-001</span>
+        <span className={styles.footerDesignation}>
+          SYS AXM-BDE {'//'} UNIT-001
+        </span>
         <span>AXUMORTEM</span>
       </footer>
     </div>

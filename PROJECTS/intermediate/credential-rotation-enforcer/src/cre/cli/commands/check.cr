@@ -32,7 +32,7 @@ module CRE::Cli::Commands
       CRE::Policy::Evaluator.new(bus, persist).evaluate_all
       sleep 0.1.seconds
 
-      violations = drain(ch).select(&.is_a?(CRE::Events::PolicyViolation)).map(&.as(CRE::Events::PolicyViolation))
+      violations = drain(ch).select(CRE::Events::PolicyViolation).map(&.as(CRE::Events::PolicyViolation))
       bus.stop
       persist.close
 

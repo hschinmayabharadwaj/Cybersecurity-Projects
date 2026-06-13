@@ -1,0 +1,239 @@
+# =============================================================================
+# ©AngelaMos | 2026
+# justfile
+# =============================================================================
+
+set shell := ["bash", "-uc"]
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+
+project := file_name(justfile_directory())
+version := `git describe --tags --always 2>/dev/null || echo "dev"`
+
+# =============================================================================
+# Default
+# =============================================================================
+
+default:
+    @just --list --unsorted
+
+# =============================================================================
+# Frontend (React + Vite + Biome + Stylelint)
+# =============================================================================
+
+[group('frontend')]
+fe-install:
+    cd frontend && pnpm install --frozen-lockfile
+
+[group('frontend')]
+fe-dev:
+    cd frontend && pnpm dev
+
+[group('frontend')]
+fe-build:
+    cd frontend && pnpm build
+
+[group('frontend')]
+fe-preview:
+    cd frontend && pnpm preview
+
+[group('frontend')]
+biome *ARGS:
+    cd frontend && pnpm biome check . {{ARGS}}
+
+[group('frontend')]
+biome-fix:
+    cd frontend && pnpm biome check --write .
+
+[group('frontend')]
+stylelint *ARGS:
+    cd frontend && pnpm stylelint '**/*.scss' {{ARGS}}
+
+[group('frontend')]
+stylelint-fix:
+    cd frontend && pnpm stylelint '**/*.scss' --fix
+
+[group('frontend')]
+tsc *ARGS:
+    cd frontend && pnpm tsc --noEmit {{ARGS}}
+
+# =============================================================================
+# Backend (Go + golangci-lint + air)
+# =============================================================================
+
+[group('backend')]
+be-tidy:
+    cd backend && go mod tidy
+
+[group('backend')]
+be-vet:
+    cd backend && go vet ./...
+
+[group('backend')]
+be-lint *ARGS:
+    cd backend && golangci-lint run --timeout=5m {{ARGS}}
+
+[group('backend')]
+be-lint-fix:
+    cd backend && golangci-lint run --timeout=5m --fix
+
+[group('backend')]
+be-test *ARGS:
+    cd backend && go test -race ./... {{ARGS}}
+
+[group('backend')]
+be-test-int *ARGS:
+    cd backend && go test -race -tags=integration ./... {{ARGS}}
+
+[group('backend')]
+be-cover:
+    cd backend && go test -race -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html
+
+[group('backend')]
+be-run:
+    cd backend && go run ./cmd/canary
+
+[group('backend')]
+be-build:
+    cd backend && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/canary ./cmd/canary
+
+[group('backend')]
+be-air:
+    cd backend && air -c .air.toml
+
+# =============================================================================
+# Combined lint + test (CI gate)
+# =============================================================================
+
+[group('lint')]
+lint: be-lint biome stylelint tsc
+
+[group('lint')]
+test: be-test
+
+[group('lint')]
+ci: lint test
+
+# =============================================================================
+# Docker Compose (Production)
+# =============================================================================
+
+[group('compose')]
+up *ARGS:
+    docker compose --env-file .env up {{ARGS}}
+
+[group('compose')]
+start *ARGS:
+    docker compose --env-file .env up -d {{ARGS}}
+
+[group('compose')]
+down *ARGS:
+    docker compose --env-file .env down {{ARGS}}
+
+[group('compose')]
+stop:
+    docker compose --env-file .env stop
+
+[group('compose')]
+build *ARGS:
+    docker compose --env-file .env build {{ARGS}}
+
+[group('compose')]
+rebuild:
+    docker compose --env-file .env build --no-cache
+
+[group('compose')]
+logs *SERVICE:
+    docker compose --env-file .env logs -f {{SERVICE}}
+
+[group('compose')]
+ps:
+    docker compose --env-file .env ps
+
+# =============================================================================
+# Docker Compose (Production + Cloudflare Tunnel)
+# =============================================================================
+
+[group('tunnel')]
+tunnel-up *ARGS:
+    docker compose --env-file .env -f compose.yml -f cloudflared.compose.yml up {{ARGS}}
+
+[group('tunnel')]
+tunnel-start *ARGS:
+    docker compose --env-file .env -f compose.yml -f cloudflared.compose.yml up -d {{ARGS}}
+
+[group('tunnel')]
+tunnel-down *ARGS:
+    docker compose --env-file .env -f compose.yml -f cloudflared.compose.yml down {{ARGS}}
+
+[group('tunnel')]
+tunnel-build *ARGS:
+    docker compose --env-file .env -f compose.yml -f cloudflared.compose.yml build {{ARGS}}
+
+[group('tunnel')]
+tunnel-rebuild:
+    docker compose --env-file .env -f compose.yml -f cloudflared.compose.yml build --no-cache
+
+[group('tunnel')]
+tunnel-logs:
+    docker compose --env-file .env -f compose.yml -f cloudflared.compose.yml logs -f cloudflared
+
+# =============================================================================
+# Docker Compose (Development)
+# =============================================================================
+
+[group('dev')]
+dev-up *ARGS:
+    docker compose --env-file .env.development -f dev.compose.yml up {{ARGS}}
+
+[group('dev')]
+dev-start *ARGS:
+    docker compose --env-file .env.development -f dev.compose.yml up -d {{ARGS}}
+
+[group('dev')]
+dev-down *ARGS:
+    docker compose --env-file .env.development -f dev.compose.yml down {{ARGS}}
+
+[group('dev')]
+dev-stop:
+    docker compose --env-file .env.development -f dev.compose.yml stop
+
+[group('dev')]
+dev-build *ARGS:
+    docker compose --env-file .env.development -f dev.compose.yml build {{ARGS}}
+
+[group('dev')]
+dev-rebuild:
+    docker compose --env-file .env.development -f dev.compose.yml build --no-cache
+
+[group('dev')]
+dev-logs *SERVICE:
+    docker compose --env-file .env.development -f dev.compose.yml logs -f {{SERVICE}}
+
+[group('dev')]
+dev-ps:
+    docker compose --env-file .env.development -f dev.compose.yml ps
+
+# =============================================================================
+# Utilities
+# =============================================================================
+
+[group('util')]
+init:
+    bash scripts/init.sh
+
+[group('util')]
+ports:
+    bash scripts/randomize-ports.sh
+
+[group('util')]
+info:
+    @echo "Project: {{project}}"
+    @echo "Version: {{version}}"
+    @echo "OS: {{os()}} ({{arch()}})"
+    @echo "Module: $(head -1 backend/go.mod | cut -d' ' -f2)"
+
+[group('util')]
+clean:
+    -rm -rf frontend/.biome_cache frontend/dist frontend/.vite frontend/.vite-temp
+    -rm -rf backend/bin backend/tmp backend/coverage.out backend/coverage.html
+    @echo "Build caches cleaned."

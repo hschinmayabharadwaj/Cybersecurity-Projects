@@ -49,11 +49,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| {
-                    EnvFilter::new(
-                        "info,tower_http=debug",
-                    )
-                }),
+                .unwrap_or_else(|_| EnvFilter::new("info,tower_http=debug")),
         )
         .init();
 
@@ -67,10 +63,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to run database migrations")?;
 
-    let engine = axumortem_engine::AnalysisEngine::new()
-        .context(
-            "failed to initialize analysis engine",
-        )?;
+    let engine =
+        axumortem_engine::AnalysisEngine::new().context("failed to initialize analysis engine")?;
 
     let config = Arc::new(config);
 
@@ -83,18 +77,14 @@ async fn main() -> anyhow::Result<()> {
     let layers = ServiceBuilder::new()
         .layer(TraceLayer::new_for_http())
         .layer(middleware::cors::layer(&config))
-        .layer(DefaultBodyLimit::max(
-            config.max_upload_size,
-        ));
+        .layer(DefaultBodyLimit::max(config.max_upload_size));
 
-    let app =
-        routes::api_router().layer(layers).with_state(state);
+    let app = routes::api_router().layer(layers).with_state(state);
 
     let bind_address = config.bind_address();
-    let listener =
-        tokio::net::TcpListener::bind(&bind_address)
-            .await
-            .context("failed to bind TCP listener")?;
+    let listener = tokio::net::TcpListener::bind(&bind_address)
+        .await
+        .context("failed to bind TCP listener")?;
 
     tracing::info!("listening on {}", bind_address);
 

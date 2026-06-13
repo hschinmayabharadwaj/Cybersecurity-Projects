@@ -11,8 +11,8 @@
 // Connects to:
 //   state.rs - AppState.db
 
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use serde::Serialize;
 
 use crate::state::AppState;
@@ -23,15 +23,11 @@ pub(crate) struct HealthResponse {
     database: &'static str,
 }
 
-pub async fn check(
-    State(state): State<AppState>,
-) -> Json<HealthResponse> {
-    let db_status =
-        match sqlx::query("SELECT 1").execute(&state.db).await
-        {
-            Ok(_) => "connected",
-            Err(_) => "disconnected",
-        };
+pub async fn check(State(state): State<AppState>) -> Json<HealthResponse> {
+    let db_status = match sqlx::query("SELECT 1").execute(&state.db).await {
+        Ok(_) => "connected",
+        Err(_) => "disconnected",
+    };
 
     Json(HealthResponse {
         status: "ok",

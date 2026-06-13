@@ -29,9 +29,7 @@ export function MitrePage() {
   const { data: techniques } = useMitreTechniques()
   const { data: heatmap } = useMitreHeatmap()
 
-  const countMap = new Map(
-    heatmap?.map((h) => [h.technique_id, h.count])
-  )
+  const countMap = new Map(heatmap?.map((h) => [h.technique_id, h.count]))
 
   const byTactic = new Map<string, typeof techniques>()
   for (const t of techniques ?? []) {
@@ -51,9 +49,7 @@ export function MitrePage() {
         <span className={styles.legendLabel}>INTENSITY</span>
         {HEAT_THRESHOLDS.map((t, i) => (
           <span key={t} className={styles.legendItem}>
-            <span
-              className={`${styles.legendSwatch} ${styles[`heat${i}`]}`}
-            />
+            <span className={`${styles.legendSwatch} ${styles[`heat${i}`]}`} />
             <span className={styles.legendText}>{t}+</span>
           </span>
         ))}
@@ -66,9 +62,7 @@ export function MitrePage() {
 
           return (
             <div key={tactic} className={styles.tacticColumn}>
-              <h3 className={styles.tacticLabel}>
-                {tactic.replace(/-/g, ' ')}
-              </h3>
+              <h3 className={styles.tacticLabel}>{tactic.replace(/-/g, ' ')}</h3>
               <div className={styles.techniques}>
                 {techs.map((t) => {
                   const count = countMap.get(t.id) ?? 0
@@ -83,9 +77,7 @@ export function MitrePage() {
                       <span className={styles.techId}>{t.id}</span>
                       <span className={styles.techName}>{t.name}</span>
                       {count > 0 && (
-                        <span className={styles.techCount}>
-                          {count}
-                        </span>
+                        <span className={styles.techCount}>{count}</span>
                       )}
                     </div>
                   )

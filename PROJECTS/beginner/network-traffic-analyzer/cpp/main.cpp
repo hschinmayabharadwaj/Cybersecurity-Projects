@@ -39,8 +39,8 @@ int main(int argc, char **argv) {
 	/* get a filter, use vector for multiple  */
 	std::vector<filter> filters;
 	if (parser.vm.contains("filter")) {
-		auto &f = parser.vm["filter"].as<std::vector<std::string>>();
-		for (auto &x : f) {
+		const auto &f = parser.vm["filter"].as<std::vector<std::string>>();
+		for (const auto &x : f) {
 			filters.push_back(parse(x));
 			filterString += x + " ";
 		}
@@ -82,12 +82,9 @@ int main(int argc, char **argv) {
 	/* our class for UI */
 	View view;
 	std::mutex render_mtx;
-	std::mutex event_mtx;
 	ftxui::Element current_render = isOffline
 										? view.render(stats.get_snapshot(), interface, filterString, true, timer.load())
 										: ftxui::text("Starting capture...");
-
-	std::mutex screen_mtx;
 
 	auto component = ftxui::Renderer([&] {
 		std::lock_guard<std::mutex> lock(render_mtx);

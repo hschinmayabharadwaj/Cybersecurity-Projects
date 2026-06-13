@@ -1,0 +1,146 @@
+# =============================================================================
+# ©AngelaMos | 2026
+# dev.compose.yml
+# =============================================================================
+# Development compose: nginx → vite (HMR) + canary (Air hot-reload) + Postgres + Redis + Jaeger
+# Uses .env.development
+# =============================================================================
+
+name: ${APP_NAME:-canary-token-generator}-dev
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ${APP_NAME:-canary-token-generator}-nginx-dev
+    ports:
+      - "${NGINX_HOST_PORT:-22784}:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/dev.nginx:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+      canary:
+        condition: service_healthy
+    networks:
+      - app
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../infra/docker/vite.dev
+    container_name: ${APP_NAME:-canary-token-generator}-frontend-dev
+    ports:
+      - "${FRONTEND_HOST_PORT:-15723}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_modules:/app/node_modules
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-/api}
+      - VITE_API_TARGET=${VITE_API_TARGET:-http://canary:8080}
+      - VITE_APP_TITLE=${VITE_APP_TITLE:-Canary Token Generator}
+      - VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY:-}
+    networks:
+      - app
+    restart: unless-stopped
+
+  canary:
+    build:
+      context: ./backend
+      dockerfile: ../infra/docker/canary.dev
+    container_name: ${APP_NAME:-canary-token-generator}-canary-dev
+    volumes:
+      - ./backend:/app
+      - canary_gocache:/root/.cache/go-build
+      - canary_gomodcache:/go/pkg/mod
+    environment:
+      - APP_ENVIRONMENT=development
+      - DATABASE_URL=postgres://canary:canary@postgres:5432/canary?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:58495}
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
+      - OPERATOR_TOKEN=${OPERATOR_TOKEN:-dev-operator-token}
+      - GEOLITE_PATH=${GEOLITE_PATH:-/app/testdata/GeoLite2-City.mmdb}
+      - WEBHOOK_HMAC_SECRET=${WEBHOOK_HMAC_SECRET:-}
+      - MYSQL_FAKE_ENABLED=${MYSQL_FAKE_ENABLED:-false}
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=text
+      - OTEL_ENABLED=${OTEL_ENABLED:-true}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_INSECURE=true
+    networks:
+      - app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: ${APP_NAME:-canary-token-generator}-postgres-dev
+    ports:
+      - "${POSTGRES_DEV_PORT:-5447}:5432"
+    environment:
+      POSTGRES_USER: canary
+      POSTGRES_PASSWORD: canary
+      POSTGRES_DB: canary
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canary -d canary"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${APP_NAME:-canary-token-generator}-redis-dev
+    ports:
+      - "${REDIS_DEV_PORT:-6022}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata_dev:/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    container_name: ${APP_NAME:-canary-token-generator}-jaeger-dev
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"
+      - "${JAEGER_OTLP_HTTP_PORT:-4318}:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - app
+    restart: unless-stopped
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  frontend_modules:
+  pgdata_dev:
+  redisdata_dev:
+  canary_gocache:
+  canary_gomodcache:

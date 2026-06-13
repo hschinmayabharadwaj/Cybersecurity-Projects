@@ -50,7 +50,7 @@ module CRE::Rotators
       pending = pending_path(path)
 
       existing = File.exists?(path) ? File.read(path) : ""
-      lines = existing.lines(chomp: true).reject { |line| line.strip.starts_with?("#{key}=") }
+      lines = existing.lines(chomp: true).reject(&.strip.starts_with?("#{key}="))
       new_value = String.new(s.ciphertext)
       lines << "#{key}=#{new_value}"
 

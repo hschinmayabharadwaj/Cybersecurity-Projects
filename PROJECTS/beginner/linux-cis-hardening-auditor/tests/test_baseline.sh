@@ -138,11 +138,11 @@ test_baseline_missing_file() {
     CURRENT_TEST="test_baseline_missing_file"
     setup_test "${PROJECT_DIR}/testdata/fixtures"
 
-    local result
-    result=$(load_baseline "/tmp/nonexistent_baseline_12345.json" 2>&1) || true
+    local result rc
+    result=$(load_baseline "/tmp/nonexistent_baseline_12345.json" 2>&1) && rc=0 || rc=$?
 
     ((TEST_TOTAL++)) || true
-    if [[ $? -eq 0 ]] || echo "$result" | grep -q "not found"; then
+    if (( rc == 0 )) || echo "$result" | grep -q "not found"; then
         ((TEST_PASS++)) || true
     else
         ((TEST_FAIL++)) || true

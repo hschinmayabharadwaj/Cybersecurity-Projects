@@ -25,7 +25,7 @@ fail()    { echo -e "${RED}[✖]${RESET} $1" >&2; exit "$EXIT_FAIL"; }
 
 progress() {
     [[ "$QUIET" == "true" ]] && return
-    printf "\r${DIM}[%s] Checking: %s${RESET}%s" "$1" "$2" "$(printf '%40s')" >&2
+    printf "\r${DIM}[%s] Checking: %s${RESET}%s" "$1" "$2" "$(printf '%40s' '')" >&2
 }
 
 clear_progress() {
@@ -120,6 +120,7 @@ service_is_active() {
 }
 
 package_is_installed() {
+    # shellcheck disable=SC2016 # ${Status} is dpkg-query template syntax, not shell expansion
     if run_cmd dpkg-query -W -f='${Status}' "$1" | grep -q "install ok installed"; then
         return 0
     fi

@@ -1,0 +1,13 @@
+# ©AngelaMos | 2026
+# .gitignore
+
+# Zig build artifacts and compilation cache
+.zig-cache/
+zig-out/
+
+# Local-only development docs (handoffs, archives, Zig reference notes)
+docs/
+
+# HSM state files if ever written into the project dir
+.angelamos-hsm-*
+*.tmp

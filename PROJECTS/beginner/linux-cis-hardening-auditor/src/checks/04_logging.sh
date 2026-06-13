@@ -333,6 +333,7 @@ check_4_2_3() {
     fi
 
     local file_mode
+    # shellcheck disable=SC2016 # literal $FileCreateMode and $2 are regex/awk syntax
     file_mode=$(grep -E '^\s*\$FileCreateMode' "$rsyslog_conf" | tail -1 | awk '{print $2}') || true
 
     if [[ -z "$file_mode" ]]; then
@@ -369,6 +370,7 @@ check_4_2_4() {
         evidence="Found ${rule_count} logging rule(s) in rsyslog.conf"
     else
         local include_count
+        # shellcheck disable=SC2016 # literal $IncludeConfig is regex syntax, not shell
         include_count=$(grep -cE '^\s*\$IncludeConfig|^\s*include\(' "$rsyslog_conf") || true
 
         if [[ "$include_count" -gt 0 ]]; then

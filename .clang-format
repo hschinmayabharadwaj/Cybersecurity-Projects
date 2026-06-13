@@ -1,0 +1,15 @@
+# ©AngelaMos | 2026
+# .clang-format
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+SortIncludes: CaseSensitive
+PointerAlignment: Left
+SpaceBeforeParens: ControlStatements
+BreakBeforeBraces: Attach

@@ -35,9 +35,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::EngineError;
-use crate::types::{
-    Architecture, BinaryFormat, Endianness, SectionPermissions,
-};
+use crate::types::{Architecture, BinaryFormat, Endianness, SectionPermissions};
 
 pub const SUSPICIOUS_SECTION_NAMES: &[(&str, &str)] = &[
     ("UPX0", "UPX packer"),
@@ -192,37 +190,22 @@ pub struct MachOInfo {
     pub has_function_starts: bool,
 }
 
-pub fn parse_format(
-    data: &[u8],
-) -> Result<FormatResult, EngineError> {
-    let object =
-        goblin::Object::parse(data).map_err(|e| {
-            EngineError::InvalidBinary {
-                reason: e.to_string(),
-            }
-        })?;
+pub fn parse_format(data: &[u8]) -> Result<FormatResult, EngineError> {
+    let object = goblin::Object::parse(data).map_err(|e| EngineError::InvalidBinary {
+        reason: e.to_string(),
+    })?;
 
     match &object {
-        goblin::Object::Elf(elf_obj) => {
-            elf::parse_elf(elf_obj, data)
-        }
-        goblin::Object::PE(pe_obj) => {
-            pe::parse_pe(pe_obj, data)
-        }
-        goblin::Object::Mach(mach_obj) => {
-            macho::parse_macho(mach_obj, data)
-        }
+        goblin::Object::Elf(elf_obj) => elf::parse_elf(elf_obj, data),
+        goblin::Object::PE(pe_obj) => pe::parse_pe(pe_obj, data),
+        goblin::Object::Mach(mach_obj) => macho::parse_macho(mach_obj, data),
         _ => Err(EngineError::UnsupportedFormat {
             format: "unknown".into(),
         }),
     }
 }
 
-fn compute_section_hash(
-    data: &[u8],
-    offset: u64,
-    size: u64,
-) -> String {
+fn compute_section_hash(data: &[u8], offset: u64, size: u64) -> String {
     if size == 0 {
         return String::new();
     }
@@ -251,53 +234,32 @@ fn detect_common_anomalies(
 ) -> Vec<FormatAnomaly> {
     let mut anomalies = Vec::new();
 
-    let text_section =
-        sections.iter().find(|s| s.name == ".text");
+    let text_section = sections.iter().find(|s| s.name == ".text");
     if let Some(text) = text_section {
-        let text_end =
-            text.virtual_address + text.virtual_size;
-        if entry_point != 0
-            && (entry_point < text.virtual_address
-                || entry_point >= text_end)
-        {
-            anomalies.push(
-                FormatAnomaly::EntryPointOutsideText {
-                    ep: entry_point,
-                    text_range: (
-                        text.virtual_address,
-                        text_end,
-                    ),
-                },
-            );
+        let text_end = text.virtual_address + text.virtual_size;
+        if entry_point != 0 && (entry_point < text.virtual_address || entry_point >= text_end) {
+            anomalies.push(FormatAnomaly::EntryPointOutsideText {
+                ep: entry_point,
+                text_range: (text.virtual_address, text_end),
+            });
         }
     }
 
     if let Some(last) = sections.last() {
-        let last_end =
-            last.virtual_address + last.virtual_size;
-        if entry_point >= last.virtual_address
-            && entry_point < last_end
-        {
-            anomalies.push(
-                FormatAnomaly::EntryPointInLastSection {
-                    ep: entry_point,
-                    section: last.name.clone(),
-                },
-            );
+        let last_end = last.virtual_address + last.virtual_size;
+        if entry_point >= last.virtual_address && entry_point < last_end {
+            anomalies.push(FormatAnomaly::EntryPointInLastSection {
+                ep: entry_point,
+                section: last.name.clone(),
+            });
         }
     }
 
     let ep_in_any = sections.iter().any(|s| {
-        entry_point >= s.virtual_address
-            && entry_point
-                < s.virtual_address + s.virtual_size
+        entry_point >= s.virtual_address && entry_point < s.virtual_address + s.virtual_size
     });
     if !ep_in_any && entry_point != 0 {
-        anomalies.push(
-            FormatAnomaly::EntryPointOutsideSections {
-                ep: entry_point,
-            },
-        );
+        anomalies.push(FormatAnomaly::EntryPointOutsideSections { ep: entry_point });
     }
 
     for (idx, section) in sections.iter().enumerate() {
@@ -308,47 +270,31 @@ fn detect_common_anomalies(
         }
 
         if section.name.is_empty() {
-            anomalies.push(
-                FormatAnomaly::EmptySectionName {
-                    index: idx,
-                },
-            );
+            anomalies.push(FormatAnomaly::EmptySectionName { index: idx });
         }
 
-        if let Some(reason) =
-            check_suspicious_name(&section.name)
-        {
-            anomalies.push(
-                FormatAnomaly::SuspiciousSectionName {
-                    name: section.name.clone(),
-                    reason,
-                },
-            );
+        if let Some(reason) = check_suspicious_name(&section.name) {
+            anomalies.push(FormatAnomaly::SuspiciousSectionName {
+                name: section.name.clone(),
+                reason,
+            });
         }
 
-        if section.permissions.execute
-            && section.virtual_size == 0
-        {
-            anomalies.push(
-                FormatAnomaly::ZeroSizeCodeSection {
-                    name: section.name.clone(),
-                },
-            );
+        if section.permissions.execute && section.virtual_size == 0 {
+            anomalies.push(FormatAnomaly::ZeroSizeCodeSection {
+                name: section.name.clone(),
+            });
         }
 
         if section.raw_size > 0 {
-            let ratio = section.virtual_size as f64
-                / section.raw_size as f64;
+            let ratio = section.virtual_size as f64 / section.raw_size as f64;
             if ratio > VIRTUAL_RAW_RATIO_THRESHOLD {
-                anomalies.push(
-                    FormatAnomaly::VirtualRawSizeMismatch {
-                        name: section.name.clone(),
-                        virtual_size: section
-                            .virtual_size,
-                        raw_size: section.raw_size,
-                        ratio,
-                    },
-                );
+                anomalies.push(FormatAnomaly::VirtualRawSizeMismatch {
+                    name: section.name.clone(),
+                    virtual_size: section.virtual_size,
+                    raw_size: section.raw_size,
+                    ratio,
+                });
             }
         }
     }

@@ -16,9 +16,9 @@
 //   routes/upload.rs   - returned from upload handler
 //   routes/analysis.rs - returned from analysis lookup
 
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -32,6 +32,7 @@ struct ErrorDetail {
     message: String,
 }
 
+#[allow(dead_code)]
 pub enum ApiError {
     NoFile,
     FileTooLarge { max_bytes: usize },
@@ -71,37 +72,23 @@ impl IntoResponse for ApiError {
             Self::NoFile => (
                 StatusCode::BAD_REQUEST,
                 "NO_FILE",
-                "No file was provided in the upload"
-                    .to_string(),
+                "No file was provided in the upload".to_string(),
             ),
             Self::FileTooLarge { max_bytes } => (
                 StatusCode::BAD_REQUEST,
                 "FILE_TOO_LARGE",
-                format!(
-                    "File exceeds maximum allowed size of {} bytes",
-                    max_bytes
-                ),
+                format!("File exceeds maximum allowed size of {} bytes", max_bytes),
             ),
-            Self::InvalidBinary { reason } => (
-                StatusCode::BAD_REQUEST,
-                "INVALID_BINARY",
-                reason,
-            ),
-            Self::AnalysisFailed { reason } => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "ANALYSIS_FAILED",
-                reason,
-            ),
+            Self::InvalidBinary { reason } => (StatusCode::BAD_REQUEST, "INVALID_BINARY", reason),
+            Self::AnalysisFailed { reason } => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "ANALYSIS_FAILED", reason)
+            }
             Self::NotFound { resource } => (
                 StatusCode::NOT_FOUND,
                 "NOT_FOUND",
                 format!("{resource} not found"),
             ),
-            Self::Internal { reason } => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL",
-                reason,
-            ),
+            Self::Internal { reason } => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL", reason),
         };
 
         (

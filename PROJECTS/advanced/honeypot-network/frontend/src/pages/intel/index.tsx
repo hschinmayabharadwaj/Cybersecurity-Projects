@@ -27,24 +27,16 @@ export function IntelPage() {
     const res = await apiClient.get(API_ENDPOINTS.IOCS.EXPORT_STIX, {
       responseType: 'text',
     })
-    downloadBlob(
-      res.data as string,
-      'hive-iocs.stix.json',
-      'application/json'
-    )
+    downloadBlob(res.data as string, 'hive-iocs.stix.json', 'application/json')
   }
 
   async function exportBlocklist(format: string) {
-    const res = await apiClient.get(
-      API_ENDPOINTS.IOCS.EXPORT_BLOCKLIST,
-      { params: { format }, responseType: 'text' }
-    )
+    const res = await apiClient.get(API_ENDPOINTS.IOCS.EXPORT_BLOCKLIST, {
+      params: { format },
+      responseType: 'text',
+    })
     const ext = format === 'csv' ? '.csv' : '.txt'
-    downloadBlob(
-      res.data as string,
-      `hive-blocklist${ext}`,
-      'text/plain'
-    )
+    downloadBlob(res.data as string, `hive-blocklist${ext}`, 'text/plain')
   }
 
   return (
@@ -52,18 +44,12 @@ export function IntelPage() {
       <header className={styles.heading}>
         <div className={styles.headingLeft}>
           <h1 className={styles.title}>Intel</h1>
-          <span className={styles.subtitle}>
-            THREAT INTELLIGENCE PRODUCTS
-          </span>
+          <span className={styles.subtitle}>THREAT INTELLIGENCE PRODUCTS</span>
         </div>
 
         <div className={styles.exports}>
           <span className={styles.exportLabel}>EXPORT</span>
-          <button
-            type="button"
-            className={styles.exportBtn}
-            onClick={exportSTIX}
-          >
+          <button type="button" className={styles.exportBtn} onClick={exportSTIX}>
             STIX 2.1
           </button>
           {BLOCKLIST_FORMATS.map((fmt) => (
@@ -103,12 +89,8 @@ export function IntelPage() {
                   <td>{ioc.confidence}%</td>
                   <td>{ioc.sight_count}</td>
                   <td>{ioc.source}</td>
-                  <td>
-                    {new Date(ioc.first_seen).toLocaleDateString()}
-                  </td>
-                  <td>
-                    {new Date(ioc.last_seen).toLocaleDateString()}
-                  </td>
+                  <td>{new Date(ioc.first_seen).toLocaleDateString()}</td>
+                  <td>{new Date(ioc.last_seen).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -120,25 +102,20 @@ export function IntelPage() {
               className={styles.pageBtn}
               disabled={offset === 0}
               onClick={() =>
-                setOffset(
-                  Math.max(0, offset - PAGINATION.DEFAULT_LIMIT)
-                )
+                setOffset(Math.max(0, offset - PAGINATION.DEFAULT_LIMIT))
               }
             >
               &#9664; PREV
             </button>
             <span className={styles.pageInfo}>
               {offset + 1}&ndash;
-              {Math.min(offset + PAGINATION.DEFAULT_LIMIT, total)} OF{' '}
-              {total}
+              {Math.min(offset + PAGINATION.DEFAULT_LIMIT, total)} OF {total}
             </span>
             <button
               type="button"
               className={styles.pageBtn}
               disabled={offset + PAGINATION.DEFAULT_LIMIT >= total}
-              onClick={() =>
-                setOffset(offset + PAGINATION.DEFAULT_LIMIT)
-              }
+              onClick={() => setOffset(offset + PAGINATION.DEFAULT_LIMIT)}
             >
               NEXT &#9654;
             </button>

@@ -1,0 +1,16 @@
+// ©AngelaMos | 2026
+// build.zig.zon
+.{
+    .name = .hsm_emulator,
+    .version = "0.1.0",
+    .fingerprint = 0x42f25b5af31e3d64,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "pkcs11.map",
+        "src",
+        "vendor",
+    },
+}

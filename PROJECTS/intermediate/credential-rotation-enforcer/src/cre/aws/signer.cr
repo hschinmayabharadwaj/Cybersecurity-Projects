@@ -79,7 +79,7 @@ module CRE::Aws
     end
 
     private def canonical_query(query : String?) : String
-      return "" unless query && !query.empty?
+      return "" if query.nil? || query.empty?
       params = [] of {String, String}
       query.split('&') do |pair|
         eq = pair.index('=')
@@ -99,7 +99,7 @@ module CRE::Aws
     private def canonical_headers_and_list(headers : HTTP::Headers) : {String, String}
       sorted = headers.to_a.map { |name, values|
         {name.downcase, values.first.strip.gsub(/\s+/, " ")}
-      }.sort_by { |entry| entry[0] }
+      }.sort_by! { |entry| entry[0] }
 
       canonical = sorted.map { |k, v| "#{k}:#{v}\n" }.join
       list = sorted.map(&.[0]).join(';')

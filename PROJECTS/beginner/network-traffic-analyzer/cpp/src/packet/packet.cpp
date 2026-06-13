@@ -15,7 +15,7 @@ ApplicationProtocol Packet::get_application_protocol() {
 			return ApplicationProtocol::DNS;
 		}
 
-		if (transport_protocol == TransportProtocol::TCP && payload_len >= 3) {
+		if (transport_protocol == TransportProtocol::TCP) {
 			if (payload_ptr[0] == 0x16 && payload_ptr[1] == 0x03) {
 				return ApplicationProtocol::HTTPS;
 			}

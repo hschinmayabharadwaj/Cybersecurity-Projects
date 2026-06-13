@@ -38,6 +38,7 @@ pub struct AnalysisRow {
 }
 
 #[derive(FromRow)]
+#[allow(dead_code)]
 pub struct PassResultRow {
     pub id: Uuid,
     pub analysis_id: Uuid,

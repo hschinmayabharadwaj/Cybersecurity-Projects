@@ -17,8 +17,8 @@
 
 use std::collections::HashMap;
 
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
@@ -53,15 +53,12 @@ pub async fn get_by_slug(
             resource: format!("analysis '{slug}'"),
         })?;
 
-    let pass_rows =
-        queries::find_pass_results(&state.db, row.id)
-            .await?;
+    let pass_rows = queries::find_pass_results(&state.db, row.id).await?;
 
-    let passes: HashMap<String, serde_json::Value> =
-        pass_rows
-            .into_iter()
-            .map(|p| (p.pass_name, p.result))
-            .collect();
+    let passes: HashMap<String, serde_json::Value> = pass_rows
+        .into_iter()
+        .map(|p| (p.pass_name, p.result))
+        .collect();
 
     Ok(Json(AnalysisResponse {
         id: row.id,

@@ -14,8 +14,8 @@ Connects to:
   tests/data/small_wordlist.txt - fixture wordlist
 */
 
-#include <gtest/gtest.h>
 #include "src/attack/DictionaryAttack.hpp"
+#include <gtest/gtest.h>
 #include <vector>
 
 TEST(DictionaryAttackTest, ReadsAllWords) {
@@ -38,8 +38,12 @@ TEST(DictionaryAttackTest, PartitionsAcrossThreads) {
     ASSERT_TRUE(p1.has_value());
 
     std::size_t count0 = 0, count1 = 0;
-    while (p0->next()) { ++count0; }
-    while (p1->next()) { ++count1; }
+    while (p0->next()) {
+        ++count0;
+    }
+    while (p1->next()) {
+        ++count1;
+    }
     EXPECT_EQ(count0 + count1, 10);
 }
 

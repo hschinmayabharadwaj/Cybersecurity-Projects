@@ -10,7 +10,7 @@ class View {
 
   private:
 	static ftxui::Element render_header(const StatsSnapshot &data, const std::string &interface,
-	                                    const std::string &filter);
+										const std::string &filter);
 	static ftxui::Element render_stats(const StatsSnapshot &data);
 
 	static ftxui::Element render_transport(const StatsSnapshot &data);

@@ -13,17 +13,15 @@
 //   config.rs - AppConfig.cors_origin
 //   main.rs   - applied as tower layer
 
-use axum::http::header::{HeaderName, ACCEPT, CONTENT_TYPE};
 use axum::http::Method;
+use axum::http::header::{ACCEPT, CONTENT_TYPE, HeaderName};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::config::AppConfig;
 
-const ALLOWED_METHODS: [Method; 3] =
-    [Method::GET, Method::POST, Method::OPTIONS];
+const ALLOWED_METHODS: [Method; 3] = [Method::GET, Method::POST, Method::OPTIONS];
 
-const ALLOWED_HEADERS: [HeaderName; 2] =
-    [CONTENT_TYPE, ACCEPT];
+const ALLOWED_HEADERS: [HeaderName; 2] = [CONTENT_TYPE, ACCEPT];
 
 pub fn layer(config: &AppConfig) -> CorsLayer {
     let base = CorsLayer::new()

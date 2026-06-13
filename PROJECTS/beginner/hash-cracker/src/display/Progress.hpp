@@ -21,25 +21,24 @@ Connects to:
 struct CrackResult;
 
 class Progress {
-public:
-    Progress(std::string_view algorithm, std::string_view attack_mode,
-             unsigned thread_count, std::size_t total_candidates,
-             const std::atomic<bool>& found,
-             const std::atomic<std::size_t>& tested);
+  public:
+    Progress(std::string_view algorithm, std::string_view attack_mode, unsigned thread_count,
+             std::size_t total_candidates, const std::atomic<bool> &found,
+             const std::atomic<std::size_t> &tested);
 
     void print_banner() const;
     void update();
-    void print_cracked(const CrackResult& result) const;
+    void print_cracked(const CrackResult &result) const;
     void print_exhausted(std::string_view hash, std::string_view algorithm) const;
     static bool is_tty();
 
-private:
+  private:
     std::string algorithm_;
     std::string attack_mode_;
     unsigned thread_count_;
     std::size_t total_;
-    const std::atomic<bool>& found_;
-    const std::atomic<std::size_t>& tested_;
+    const std::atomic<bool> &found_;
+    const std::atomic<std::size_t> &tested_;
 
     std::chrono::steady_clock::time_point start_time_;
 

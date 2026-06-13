@@ -1,0 +1,18 @@
+# ©AngelaMos | 2026
+# template.yaml.tmpl
+apiVersion: v1
+kind: Config
+current-context: {{.ClusterName}}
+clusters:
+- name: {{.ClusterName}}
+  cluster:
+    server: {{.APIServerURL}}
+contexts:
+- name: {{.ClusterName}}
+  context:
+    cluster: {{.ClusterName}}
+    user: {{.UserName}}
+users:
+- name: {{.UserName}}
+  user:
+    token: {{.Token}}

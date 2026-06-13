@@ -30,9 +30,9 @@ Connects to:
 RuleAttack::RuleAttack(DictionaryAttack dict, bool chain_rules)
     : dict_(std::move(dict)), chain_rules_(chain_rules) {}
 
-std::expected<RuleAttack, CrackError> RuleAttack::create(
-    std::string_view path, bool chain_rules,
-    unsigned thread_index, unsigned total_threads) {
+std::expected<RuleAttack, CrackError> RuleAttack::create(std::string_view path, bool chain_rules,
+                                                         unsigned thread_index,
+                                                         unsigned total_threads) {
     auto dict = DictionaryAttack::create(path, thread_index, total_threads);
     if (!dict.has_value()) {
         return std::unexpected(dict.error());
@@ -49,14 +49,14 @@ bool RuleAttack::load_next_word() {
     mutations_.clear();
     mutations_.push_back(*word);
 
-    for (auto&& m : RuleSet::apply_all(*word)) {
+    for (auto &&m : RuleSet::apply_all(*word)) {
         mutations_.push_back(std::move(m));
     }
 
     if (chain_rules_) {
         std::vector<std::string> base(mutations_.begin() + 1, mutations_.end());
-        for (const auto& b : base) {
-            for (auto&& m : RuleSet::apply_all(b)) {
+        for (const auto &b : base) {
+            for (auto &&m : RuleSet::apply_all(b)) {
                 mutations_.push_back(std::move(m));
             }
         }
@@ -77,5 +77,9 @@ std::expected<std::string, AttackComplete> RuleAttack::next() {
     return std::move(mutations_[mutation_index_++]);
 }
 
-std::size_t RuleAttack::total() const { return dict_.total(); }
-std::size_t RuleAttack::progress() const { return candidates_yielded_; }
+std::size_t RuleAttack::total() const {
+    return dict_.total();
+}
+std::size_t RuleAttack::progress() const {
+    return candidates_yielded_;
+}

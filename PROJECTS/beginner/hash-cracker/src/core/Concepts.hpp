@@ -50,12 +50,18 @@ enum class CrackError {
 
 constexpr std::string_view crack_error_message(CrackError e) {
     switch (e) {
-        case CrackError::FileNotFound: return "File not found";
-        case CrackError::InvalidHash: return "Invalid hash format";
-        case CrackError::UnsupportedAlgorithm: return "Unsupported hash algorithm";
-        case CrackError::OpenSSLError: return "OpenSSL internal error";
-        case CrackError::InvalidConfig: return "Invalid configuration";
-        case CrackError::Exhausted: return "All candidates exhausted";
+        case CrackError::FileNotFound:
+            return "File not found";
+        case CrackError::InvalidHash:
+            return "Invalid hash format";
+        case CrackError::UnsupportedAlgorithm:
+            return "Unsupported hash algorithm";
+        case CrackError::OpenSSLError:
+            return "OpenSSL internal error";
+        case CrackError::InvalidConfig:
+            return "Invalid configuration";
+        case CrackError::Exhausted:
+            return "All candidates exhausted";
     }
     return "Unknown error";
 }

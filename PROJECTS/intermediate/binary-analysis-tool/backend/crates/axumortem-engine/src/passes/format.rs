@@ -36,12 +36,8 @@ impl AnalysisPass for FormatPass {
         &[]
     }
 
-    fn run(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> Result<(), EngineError> {
-        let result =
-            formats::parse_format(ctx.data())?;
+    fn run(&self, ctx: &mut AnalysisContext) -> Result<(), EngineError> {
+        let result = formats::parse_format(ctx.data())?;
         ctx.format_result = Some(result);
         Ok(())
     }
@@ -56,13 +52,8 @@ mod tests {
     use crate::types::{Architecture, BinaryFormat, Endianness};
 
     fn load_fixture(name: &str) -> Vec<u8> {
-        let path = format!(
-            "{}/tests/fixtures/{name}",
-            env!("CARGO_MANIFEST_DIR"),
-        );
-        std::fs::read(&path).unwrap_or_else(|e| {
-            panic!("fixture {path}: {e}")
-        })
+        let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
     }
 
     fn make_ctx(data: Vec<u8>) -> AnalysisContext {
@@ -78,19 +69,12 @@ mod tests {
     #[test]
     fn parse_elf_basic_metadata() {
         let data = load_fixture("hello_elf");
-        let result =
-            formats::parse_format(&data).unwrap();
+        let result = formats::parse_format(&data).unwrap();
 
         assert_eq!(result.format, BinaryFormat::Elf);
-        assert_eq!(
-            result.architecture,
-            Architecture::X86_64
-        );
+        assert_eq!(result.architecture, Architecture::X86_64);
         assert_eq!(result.bits, 64);
-        assert_eq!(
-            result.endianness,
-            Endianness::Little
-        );
+        assert_eq!(result.endianness, Endianness::Little);
         assert!(result.entry_point > 0);
         assert!(result.is_pie);
         assert!(!result.is_stripped);
@@ -99,14 +83,10 @@ mod tests {
     #[test]
     fn parse_elf_sections_present() {
         let data = load_fixture("hello_elf");
-        let result =
-            formats::parse_format(&data).unwrap();
+        let result = formats::parse_format(&data).unwrap();
 
         assert!(!result.sections.is_empty());
-        let text = result
-            .sections
-            .iter()
-            .find(|s| s.name == ".text");
+        let text = result.sections.iter().find(|s| s.name == ".text");
         assert!(text.is_some());
         assert!(text.unwrap().permissions.execute);
     }
@@ -114,41 +94,35 @@ mod tests {
     #[test]
     fn parse_elf_segments_present() {
         let data = load_fixture("hello_elf");
-        let result =
-            formats::parse_format(&data).unwrap();
+        let result = formats::parse_format(&data).unwrap();
 
         assert!(!result.segments.is_empty());
         let load_segments: Vec<_> = result
             .segments
             .iter()
-            .filter(|s| {
-                s.name.as_deref() == Some("LOAD")
-            })
+            .filter(|s| s.name.as_deref() == Some("LOAD"))
             .collect();
         assert!(!load_segments.is_empty());
     }
 
     #[test]
     fn parse_elf_stripped_detection() {
-        let data =
-            load_fixture("hello_elf_stripped");
-        let result =
-            formats::parse_format(&data).unwrap();
+        let data = load_fixture("hello_elf_stripped");
+        let result = formats::parse_format(&data).unwrap();
 
         assert!(result.is_stripped);
-        assert!(result.anomalies.iter().any(|a| {
-            matches!(
-                a,
-                FormatAnomaly::StrippedBinary
-            )
-        }));
+        assert!(
+            result
+                .anomalies
+                .iter()
+                .any(|a| { matches!(a, FormatAnomaly::StrippedBinary) })
+        );
     }
 
     #[test]
     fn parse_elf_info_populated() {
         let data = load_fixture("hello_elf");
-        let result =
-            formats::parse_format(&data).unwrap();
+        let result = formats::parse_format(&data).unwrap();
 
         let elf_info = result.elf_info.unwrap();
         assert!(!elf_info.os_abi.is_empty());
@@ -160,18 +134,10 @@ mod tests {
     #[test]
     fn parse_elf_section_hashes() {
         let data = load_fixture("hello_elf");
-        let result =
-            formats::parse_format(&data).unwrap();
+        let result = formats::parse_format(&data).unwrap();
 
-        let text = result
-            .sections
-            .iter()
-            .find(|s| s.name == ".text")
-            .unwrap();
-        assert!(
-            !text.sha256.is_empty(),
-            ".text section should have a hash"
-        );
+        let text = result.sections.iter().find(|s| s.name == ".text").unwrap();
+        assert!(!text.sha256.is_empty(), ".text section should have a hash");
         assert_eq!(text.sha256.len(), 64);
     }
 
@@ -184,8 +150,8 @@ mod tests {
 
     #[test]
     fn format_pass_populates_context() {
-        use crate::pass::AnalysisPass;
         use super::FormatPass;
+        use crate::pass::AnalysisPass;
 
         let data = load_fixture("hello_elf");
         let mut ctx = make_ctx(data);

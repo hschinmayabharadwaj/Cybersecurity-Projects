@@ -110,6 +110,7 @@ emit_json_report() {
         local status="${RESULT_STATUS[$id]}"
         local evidence="${RESULT_EVIDENCE[$id]:-}"
         local title="${CTRL_TITLE[$id]}"
+        # shellcheck disable=SC2153 # CTRL_SECTION is a populated global associative array
         local ctrl_section="${CTRL_SECTION[$id]}"
         local level="${CTRL_LEVEL[$id]}"
         local scored="${CTRL_SCORED[$id]}"

@@ -1,0 +1,8 @@
+/* ©AngelaMos | 2026 */
+/* pkcs11.map */
+PKCS11_2_40 {
+    global:
+        C_GetFunctionList;
+    local:
+        *;
+};

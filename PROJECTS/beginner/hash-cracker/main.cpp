@@ -29,11 +29,6 @@ Connects to:
   attack/RuleAttack.hpp       - RuleAttack for mutation mode
 */
 
-#include <boost/program_options.hpp>
-#include <expected>
-#include <iostream>
-#include <print>
-#include <string>
 #include "src/attack/BruteForceAttack.hpp"
 #include "src/attack/DictionaryAttack.hpp"
 #include "src/attack/RuleAttack.hpp"
@@ -45,20 +40,31 @@ Connects to:
 #include "src/hash/SHA1Hasher.hpp"
 #include "src/hash/SHA256Hasher.hpp"
 #include "src/hash/SHA512Hasher.hpp"
+#include <boost/program_options.hpp>
+#include <expected>
+#include <iostream>
+#include <print>
+#include <string>
 
 namespace po = boost::program_options;
 
-static std::string build_charset(const std::string& spec) {
+static std::string build_charset(const std::string &spec) {
     std::string result;
 
-    auto has = [&](std::string_view token) {
-        return spec.find(token) != std::string::npos;
-    };
+    auto has = [&](std::string_view token) { return spec.find(token) != std::string::npos; };
 
-    if (has("lower")) { result += config::CHARSET_LOWER; }
-    if (has("upper")) { result += config::CHARSET_UPPER; }
-    if (has("digits")) { result += config::CHARSET_DIGITS; }
-    if (has("special")) { result += config::CHARSET_SPECIAL; }
+    if (has("lower")) {
+        result += config::CHARSET_LOWER;
+    }
+    if (has("upper")) {
+        result += config::CHARSET_UPPER;
+    }
+    if (has("digits")) {
+        result += config::CHARSET_DIGITS;
+    }
+    if (has("special")) {
+        result += config::CHARSET_SPECIAL;
+    }
 
     if (result.empty()) {
         result += config::CHARSET_LOWER;
@@ -69,8 +75,7 @@ static std::string build_charset(const std::string& spec) {
 }
 
 template <Hasher H>
-static auto dispatch_attack(const CrackConfig& cfg)
-    -> std::expected<CrackResult, CrackError> {
+static auto dispatch_attack(const CrackConfig &cfg) -> std::expected<CrackResult, CrackError> {
     if (cfg.bruteforce) {
         return Engine::crack<H, BruteForceAttack>(cfg);
     }
@@ -80,13 +85,17 @@ static auto dispatch_attack(const CrackConfig& cfg)
     return Engine::crack<H, DictionaryAttack>(cfg);
 }
 
-static auto dispatch_hasher(HashType type, const CrackConfig& cfg)
+static auto dispatch_hasher(HashType type, const CrackConfig &cfg)
     -> std::expected<CrackResult, CrackError> {
     switch (type) {
-        case HashType::MD5: return dispatch_attack<MD5Hasher>(cfg);
-        case HashType::SHA1: return dispatch_attack<SHA1Hasher>(cfg);
-        case HashType::SHA256: return dispatch_attack<SHA256Hasher>(cfg);
-        case HashType::SHA512: return dispatch_attack<SHA512Hasher>(cfg);
+        case HashType::MD5:
+            return dispatch_attack<MD5Hasher>(cfg);
+        case HashType::SHA1:
+            return dispatch_attack<SHA1Hasher>(cfg);
+        case HashType::SHA256:
+            return dispatch_attack<SHA256Hasher>(cfg);
+        case HashType::SHA512:
+            return dispatch_attack<SHA512Hasher>(cfg);
     }
     return std::unexpected(CrackError::UnsupportedAlgorithm);
 }
@@ -96,68 +105,77 @@ static std::string json_escape(std::string_view s) {
     result.reserve(s.size());
     for (char c : s) {
         switch (c) {
-            case '"':  result += "\\\""; break;
-            case '\\': result += "\\\\"; break;
-            case '\n': result += "\\n";  break;
-            case '\r': result += "\\r";  break;
-            case '\t': result += "\\t";  break;
-            default:   result += c;      break;
+            case '"':
+                result += "\\\"";
+                break;
+            case '\\':
+                result += "\\\\";
+                break;
+            case '\n':
+                result += "\\n";
+                break;
+            case '\r':
+                result += "\\r";
+                break;
+            case '\t':
+                result += "\\t";
+                break;
+            default:
+                result += c;
+                break;
         }
     }
     return result;
 }
 
-static void write_json_result(const std::string& path,
-                               const CrackResult& result) {
-    auto* f = std::fopen(path.c_str(), "w");
-    if (!f) { return; }
+static void write_json_result(const std::string &path, const CrackResult &result) {
+    auto *f = std::fopen(path.c_str(), "w");
+    if (!f) {
+        return;
+    }
 
     std::fprintf(f,
-        "{\n"
-        "  \"plaintext\": \"%s\",\n"
-        "  \"hash\": \"%s\",\n"
-        "  \"algorithm\": \"%s\",\n"
-        "  \"elapsed_seconds\": %.4f,\n"
-        "  \"candidates_tested\": %zu,\n"
-        "  \"hashes_per_second\": %.2f\n"
-        "}\n",
-        json_escape(result.plaintext).c_str(),
-        json_escape(result.hash).c_str(),
-        json_escape(result.algorithm).c_str(),
-        result.elapsed_seconds,
-        result.candidates_tested,
-        result.hashes_per_second);
+                 "{\n"
+                 "  \"plaintext\": \"%s\",\n"
+                 "  \"hash\": \"%s\",\n"
+                 "  \"algorithm\": \"%s\",\n"
+                 "  \"elapsed_seconds\": %.4f,\n"
+                 "  \"candidates_tested\": %zu,\n"
+                 "  \"hashes_per_second\": %.2f\n"
+                 "}\n",
+                 json_escape(result.plaintext).c_str(), json_escape(result.hash).c_str(),
+                 json_escape(result.algorithm).c_str(), result.elapsed_seconds,
+                 result.candidates_tested, result.hashes_per_second);
 
     std::fclose(f);
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     po::options_description desc("hashcracker - Multi-threaded hash cracking tool");
-    desc.add_options()
-        ("help,h", "Show help message")
-        ("hash", po::value<std::string>(), "Target hash to crack")
-        ("type", po::value<std::string>()->default_value("auto"),
-            "Hash type: md5, sha1, sha256, sha512, auto")
-        ("wordlist,w", po::value<std::string>(), "Path to wordlist file")
-        ("bruteforce,b", "Use brute-force attack mode")
-        ("charset", po::value<std::string>()->default_value("lower,digits"),
-            "Character sets: lower,upper,digits,special")
-        ("max-length", po::value<std::size_t>()->default_value(
-            config::DEFAULT_MAX_BRUTE_LENGTH), "Max password length for brute-force")
-        ("rules,r", "Apply mutation rules to dictionary words")
-        ("chain-rules", "Chain mutation rules in combination")
-        ("salt", po::value<std::string>(), "Salt value to prepend/append")
-        ("salt-position", po::value<std::string>()->default_value("prepend"),
-            "Salt position: prepend or append")
-        ("threads,t", po::value<unsigned>()->default_value(
-            config::DEFAULT_THREAD_COUNT), "Thread count (0 = auto)")
-        ("output,o", po::value<std::string>(), "Write JSON result to file");
+    desc.add_options()("help,h", "Show help message")("hash", po::value<std::string>(),
+                                                      "Target hash to crack")(
+        "type", po::value<std::string>()->default_value("auto"),
+        "Hash type: md5, sha1, sha256, sha512, auto")("wordlist,w", po::value<std::string>(),
+                                                      "Path to wordlist file")(
+        "bruteforce,b", "Use brute-force attack mode")(
+        "charset", po::value<std::string>()->default_value("lower,digits"),
+        "Character sets: lower,upper,digits,special")(
+        "max-length", po::value<std::size_t>()->default_value(config::DEFAULT_MAX_BRUTE_LENGTH),
+        "Max password length for brute-force")("rules,r",
+                                               "Apply mutation rules to dictionary words")(
+        "chain-rules", "Chain mutation rules in combination")("salt", po::value<std::string>(),
+                                                              "Salt value to prepend/append")(
+        "salt-position", po::value<std::string>()->default_value("prepend"),
+        "Salt position: prepend or append")(
+        "threads,t", po::value<unsigned>()->default_value(config::DEFAULT_THREAD_COUNT),
+        "Thread count (0 = auto)")("output,o", po::value<std::string>(),
+                                   "Write JSON result to file");
 
     po::variables_map vm;
     try {
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
-    } catch (const po::error& e) {
+    } catch (const po::error &e) {
         std::println(stderr, "Error: {}", e.what());
         return 1;
     }
@@ -198,8 +216,7 @@ int main(int argc, char* argv[]) {
     if (cfg.hash_type == "auto") {
         auto detected = HashDetector::detect(cfg.target_hash);
         if (!detected.has_value()) {
-            std::println(stderr, "Error: {}",
-                crack_error_message(detected.error()));
+            std::println(stderr, "Error: {}", crack_error_message(detected.error()));
             return 1;
         }
         hash_type = *detected;

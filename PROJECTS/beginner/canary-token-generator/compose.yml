@@ -1,0 +1,131 @@
+# =============================================================================
+# ©AngelaMos | 2026
+# compose.yml
+# =============================================================================
+# Production compose: nginx → canary backend → postgres + redis
+# Cloudflare tunnel overlay:
+#   docker compose -f compose.yml -f cloudflared.compose.yml up -d
+# =============================================================================
+
+name: ${APP_NAME:-canary-token-generator}
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/docker/vite.prod
+      args:
+        - VITE_API_URL=${VITE_API_URL:-/api}
+        - VITE_APP_TITLE=${VITE_APP_TITLE:-Canary Token Generator}
+        - VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY:-}
+    container_name: ${APP_NAME:-canary-token-generator}-nginx
+    ports:
+      - "${NGINX_HOST_PORT:-22784}:80"
+    networks:
+      - app
+    depends_on:
+      canary:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+    restart: unless-stopped
+
+  canary:
+    build:
+      context: ./backend
+      dockerfile: ../infra/docker/canary.prod
+    container_name: ${APP_NAME:-canary-token-generator}-canary
+    environment:
+      - APP_ENVIRONMENT=production
+      - DATABASE_URL=postgres://canary:${POSTGRES_PASSWORD}@postgres:5432/canary?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET}
+      - OPERATOR_TOKEN=${OPERATOR_TOKEN}
+      - GEOLITE_PATH=/data/GeoLite2-City.mmdb
+      - WEBHOOK_HMAC_SECRET=${WEBHOOK_HMAC_SECRET:-}
+      - MYSQL_FAKE_ENABLED=${MYSQL_FAKE_ENABLED:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OTEL_ENABLED=${OTEL_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - geolite:/data:ro
+    networks:
+      - app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: ${APP_NAME:-canary-token-generator}-postgres
+    environment:
+      POSTGRES_USER: canary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: canary
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canary -d canary"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${APP_NAME:-canary-token-generator}-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    restart: unless-stopped
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  geolite:

@@ -35,13 +35,11 @@ Connects to:
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-Progress::Progress(std::string_view algorithm, std::string_view attack_mode,
-                   unsigned thread_count, std::size_t total_candidates,
-                   const std::atomic<bool>& found,
-                   const std::atomic<std::size_t>& tested)
-    : algorithm_(algorithm), attack_mode_(attack_mode),
-      thread_count_(thread_count), total_(total_candidates),
-      found_(found), tested_(tested),
+Progress::Progress(std::string_view algorithm, std::string_view attack_mode, unsigned thread_count,
+                   std::size_t total_candidates, const std::atomic<bool> &found,
+                   const std::atomic<std::size_t> &tested)
+    : algorithm_(algorithm), attack_mode_(attack_mode), thread_count_(thread_count),
+      total_(total_candidates), found_(found), tested_(tested),
       start_time_(std::chrono::steady_clock::now()) {}
 
 bool Progress::is_tty() {
@@ -85,7 +83,9 @@ std::string Progress::render_bar(double fraction, std::size_t width) const {
     }
 
     auto filled = static_cast<std::size_t>(fraction * static_cast<double>(width));
-    if (filled > width) { filled = width; }
+    if (filled > width) {
+        filled = width;
+    }
 
     std::string bar;
     bar += config::box::BAR_LEFT;
@@ -97,7 +97,9 @@ std::string Progress::render_bar(double fraction, std::size_t width) const {
 }
 
 void Progress::print_banner() const {
-    if (!is_tty()) { return; }
+    if (!is_tty()) {
+        return;
+    }
 
     auto w = terminal_width();
     auto inner_width = (w > 6) ? w - 6 : 40;
@@ -111,68 +113,58 @@ void Progress::print_banner() const {
         bot_border += config::box::HORIZONTAL;
     }
 
-    auto line1 = std::format("  {}  {}  v{}",
-        config::APP_NAME, config::box::VERTICAL, config::VERSION);
-    auto line2 = std::format("  {} {} {} {} {} threads",
-        config::box::VERTICAL, algorithm_, config::box::VERTICAL,
-        attack_mode_, thread_count_);
+    auto line1 =
+        std::format("  {}  {}  v{}", config::APP_NAME, config::box::VERTICAL, config::VERSION);
+    auto line2 = std::format("  {} {} {} {} {} threads", config::box::VERTICAL, algorithm_,
+                             config::box::VERTICAL, attack_mode_, thread_count_);
 
-    std::println("{}{}{}{}{}",
-        config::color::CYAN, config::box::TOP_LEFT,
-        top_border, config::box::TOP_RIGHT, config::color::RESET);
-    std::println("{}{} {:<{}}{}{}", config::color::CYAN,
-        config::box::VERTICAL, line1, inner_width - 1,
-        config::box::VERTICAL, config::color::RESET);
-    std::println("{}{} {:<{}}{}{}", config::color::CYAN,
-        config::box::VERTICAL, line2, inner_width - 1,
-        config::box::VERTICAL, config::color::RESET);
-    std::println("{}{}{}{}{}",
-        config::color::CYAN, config::box::BOTTOM_LEFT,
-        bot_border, config::box::BOTTOM_RIGHT, config::color::RESET);
+    std::println("{}{}{}{}{}", config::color::CYAN, config::box::TOP_LEFT, top_border,
+                 config::box::TOP_RIGHT, config::color::RESET);
+    std::println("{}{} {:<{}}{}{}", config::color::CYAN, config::box::VERTICAL, line1,
+                 inner_width - 1, config::box::VERTICAL, config::color::RESET);
+    std::println("{}{} {:<{}}{}{}", config::color::CYAN, config::box::VERTICAL, line2,
+                 inner_width - 1, config::box::VERTICAL, config::color::RESET);
+    std::println("{}{}{}{}{}", config::color::CYAN, config::box::BOTTOM_LEFT, bot_border,
+                 config::box::BOTTOM_RIGHT, config::color::RESET);
     std::println("");
 }
 
 void Progress::update() {
-    if (!is_tty()) { return; }
+    if (!is_tty()) {
+        return;
+    }
 
     auto now = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - start_time_).count();
     auto tested_val = tested_.load(std::memory_order_relaxed);
 
-    double fraction = (total_ > 0)
-        ? static_cast<double>(tested_val) / static_cast<double>(total_)
-        : 0.0;
-    if (fraction > 1.0) { fraction = 1.0; }
+    double fraction =
+        (total_ > 0) ? static_cast<double>(tested_val) / static_cast<double>(total_) : 0.0;
+    if (fraction > 1.0) {
+        fraction = 1.0;
+    }
 
-    double speed = (elapsed > 0.0)
-        ? static_cast<double>(tested_val) / elapsed
-        : 0.0;
+    double speed = (elapsed > 0.0) ? static_cast<double>(tested_val) / elapsed : 0.0;
 
     double eta = (speed > 0.0 && total_ > tested_val)
-        ? static_cast<double>(total_ - tested_val) / speed
-        : 0.0;
+                     ? static_cast<double>(total_ - tested_val) / speed
+                     : 0.0;
 
     auto bar_width = terminal_width();
     bar_width = (bar_width > 30) ? bar_width - 20 : 10;
 
     std::print("\033[3A");
 
-    std::println("  {}{} {:.1f}%{}",
-        config::color::YELLOW, render_bar(fraction, bar_width),
-        fraction * 100.0, config::color::RESET);
-    std::println("  {} {} {} {}  {} {} {} ~{}{}",
-        config::symbol::DIAMOND, config::color::CYAN,
-        format_speed(speed), config::color::RESET,
-        config::symbol::TIMER, config::color::CYAN,
-        format_time(elapsed), format_time(eta),
-        config::color::RESET);
-    std::println("  {} {} {} / {} candidates{}",
-        config::symbol::ARROW_RIGHT, config::color::CYAN,
-        format_count(tested_val), format_count(total_),
-        config::color::RESET);
+    std::println("  {}{} {:.1f}%{}", config::color::YELLOW, render_bar(fraction, bar_width),
+                 fraction * 100.0, config::color::RESET);
+    std::println("  {} {} {} {}  {} {} {} ~{}{}", config::symbol::DIAMOND, config::color::CYAN,
+                 format_speed(speed), config::color::RESET, config::symbol::TIMER,
+                 config::color::CYAN, format_time(elapsed), format_time(eta), config::color::RESET);
+    std::println("  {} {} {} / {} candidates{}", config::symbol::ARROW_RIGHT, config::color::CYAN,
+                 format_count(tested_val), format_count(total_), config::color::RESET);
 }
 
-void Progress::print_cracked(const CrackResult& result) const {
+void Progress::print_cracked(const CrackResult &result) const {
     if (!is_tty()) {
         std::println("{}", result.plaintext);
         return;
@@ -180,22 +172,17 @@ void Progress::print_cracked(const CrackResult& result) const {
 
     std::print("\033[3A\033[J");
 
-    std::println("  {}{} CRACKED {}{}{}",
-        config::color::GREEN, config::symbol::CHECK,
-        std::string(30, '-'), config::color::RESET, "");
-    std::println("  {}Password:  {}{}{}",
-        config::color::BOLD, config::color::GREEN,
-        result.plaintext, config::color::RESET);
+    std::println("  {}{} CRACKED {}{}{}", config::color::GREEN, config::symbol::CHECK,
+                 std::string(30, '-'), config::color::RESET, "");
+    std::println("  {}Password:  {}{}{}", config::color::BOLD, config::color::GREEN,
+                 result.plaintext, config::color::RESET);
     std::println("  Hash:      {}", result.hash);
     std::println("  Algorithm: {}", result.algorithm);
-    std::println("  Time:      {} {} {}",
-        format_time(result.elapsed_seconds),
-        config::box::VERTICAL,
-        format_speed(result.hashes_per_second));
+    std::println("  Time:      {} {} {}", format_time(result.elapsed_seconds),
+                 config::box::VERTICAL, format_speed(result.hashes_per_second));
 }
 
-void Progress::print_exhausted(std::string_view hash,
-                                std::string_view algorithm) const {
+void Progress::print_exhausted(std::string_view hash, std::string_view algorithm) const {
     if (!is_tty()) {
         std::println("NOT FOUND");
         return;
@@ -207,11 +194,10 @@ void Progress::print_exhausted(std::string_view hash,
 
     std::print("\033[3A\033[J");
 
-    std::println("  {}{} EXHAUSTED {}{}{}",
-        config::color::RED, config::symbol::CROSS,
-        std::string(30, '-'), config::color::RESET, "");
+    std::println("  {}{} EXHAUSTED {}{}{}", config::color::RED, config::symbol::CROSS,
+                 std::string(30, '-'), config::color::RESET, "");
     std::println("  Hash:      {}", hash);
     std::println("  Algorithm: {}", algorithm);
-    std::println("  Tested:    {} candidates in {}",
-        format_count(tested_val), format_time(elapsed));
+    std::println("  Tested:    {} candidates in {}", format_count(tested_val),
+                 format_time(elapsed));
 }

@@ -25,31 +25,23 @@
 //   types.rs       - Architecture, BinaryFormat, Endianness,
 //                     SectionPermissions
 
+use goblin::elf::Elf;
 use goblin::elf::dynamic::DT_BIND_NOW;
 use goblin::elf::header::{
-    EM_386, EM_AARCH64, EM_ARM, EM_X86_64, ET_CORE, ET_DYN,
-    ET_EXEC, ET_REL,
+    EM_386, EM_AARCH64, EM_ARM, EM_X86_64, ET_CORE, ET_DYN, ET_EXEC, ET_REL,
 };
 use goblin::elf::program_header::{
-    PF_R, PF_W, PF_X, PT_DYNAMIC, PT_GNU_EH_FRAME,
-    PT_GNU_RELRO, PT_GNU_STACK, PT_INTERP, PT_LOAD, PT_NOTE,
-    PT_NULL, PT_PHDR,
+    PF_R, PF_W, PF_X, PT_DYNAMIC, PT_GNU_EH_FRAME, PT_GNU_RELRO, PT_GNU_STACK, PT_INTERP, PT_LOAD,
+    PT_NOTE, PT_NULL, PT_PHDR,
 };
-use goblin::elf::section_header::{
-    SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE, SHT_NOBITS,
-    SHT_SYMTAB,
-};
+use goblin::elf::section_header::{SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE, SHT_NOBITS, SHT_SYMTAB};
 use goblin::elf::sym::STT_FUNC;
-use goblin::elf::Elf;
 
 use super::{
-    detect_common_anomalies, compute_section_hash, ElfInfo,
-    FormatResult, SectionInfo, SegmentInfo,
+    ElfInfo, FormatResult, SectionInfo, SegmentInfo, compute_section_hash, detect_common_anomalies,
 };
 use crate::error::EngineError;
-use crate::types::{
-    Architecture, BinaryFormat, Endianness, SectionPermissions,
-};
+use crate::types::{Architecture, BinaryFormat, Endianness, SectionPermissions};
 
 const EI_OSABI: usize = 7;
 const ELFOSABI_NONE: u8 = 0;
@@ -65,12 +57,8 @@ const ELFOSABI_STANDALONE: u8 = 255;
 const DT_FLAGS: u64 = 30;
 const DF_BIND_NOW: u64 = 0x8;
 
-pub fn parse_elf(
-    elf: &Elf,
-    data: &[u8],
-) -> Result<FormatResult, EngineError> {
-    let architecture =
-        map_architecture(elf.header.e_machine);
+pub fn parse_elf(elf: &Elf, data: &[u8]) -> Result<FormatResult, EngineError> {
+    let architecture = map_architecture(elf.header.e_machine);
     let bits = if elf.is_64 { 64 } else { 32 };
     let endianness = if elf.little_endian {
         Endianness::Little
@@ -85,32 +73,20 @@ pub fn parse_elf(
         .any(|sh| sh.sh_type == SHT_SYMTAB);
     let is_stripped = !has_symtab;
 
-    let has_interp = elf
-        .program_headers
-        .iter()
-        .any(|ph| ph.p_type == PT_INTERP);
-    let is_pie =
-        elf.header.e_type == ET_DYN && has_interp;
+    let has_interp = elf.program_headers.iter().any(|ph| ph.p_type == PT_INTERP);
+    let is_pie = elf.header.e_type == ET_DYN && has_interp;
 
-    let has_debug_info =
-        elf.section_headers.iter().any(|sh| {
-            elf.shdr_strtab
-                .get_at(sh.sh_name)
-                .is_some_and(|name| {
-                    name.starts_with(".debug_")
-                })
-        });
+    let has_debug_info = elf.section_headers.iter().any(|sh| {
+        elf.shdr_strtab
+            .get_at(sh.sh_name)
+            .is_some_and(|name| name.starts_with(".debug_"))
+    });
 
     let sections = build_sections(elf, data);
     let segments = build_segments(elf);
-    let anomalies = detect_common_anomalies(
-        &sections,
-        entry_point,
-        is_stripped,
-    );
+    let anomalies = detect_common_anomalies(&sections, entry_point, is_stripped);
     let elf_info = build_elf_info(elf);
-    let function_hints =
-        collect_function_hints(elf, entry_point);
+    let function_hints = collect_function_hints(elf, entry_point);
 
     Ok(FormatResult {
         format: BinaryFormat::Elf,
@@ -137,11 +113,7 @@ fn map_architecture(machine: u16) -> Architecture {
         EM_X86_64 => Architecture::X86_64,
         EM_ARM => Architecture::Arm,
         EM_AARCH64 => Architecture::Aarch64,
-        other => {
-            Architecture::Other(format!(
-                "elf-machine-{other}"
-            ))
-        }
+        other => Architecture::Other(format!("elf-machine-{other}")),
     }
 }
 
@@ -188,10 +160,7 @@ fn segment_type_name(p_type: u32) -> Option<String> {
     )
 }
 
-fn build_sections(
-    elf: &Elf,
-    data: &[u8],
-) -> Vec<SectionInfo> {
+fn build_sections(elf: &Elf, data: &[u8]) -> Vec<SectionInfo> {
     elf.section_headers
         .iter()
         .skip(1)
@@ -203,32 +172,16 @@ fn build_sections(
                 .to_string();
 
             let is_nobits = shdr.sh_type == SHT_NOBITS;
-            let raw_offset = if is_nobits {
-                0
-            } else {
-                shdr.sh_offset
-            };
-            let raw_size = if is_nobits {
-                0
-            } else {
-                shdr.sh_size
-            };
+            let raw_offset = if is_nobits { 0 } else { shdr.sh_offset };
+            let raw_size = if is_nobits { 0 } else { shdr.sh_size };
 
             let permissions = SectionPermissions {
-                read: (shdr.sh_flags
-                    & u64::from(SHF_ALLOC))
-                    != 0,
-                write: (shdr.sh_flags
-                    & u64::from(SHF_WRITE))
-                    != 0,
-                execute: (shdr.sh_flags
-                    & u64::from(SHF_EXECINSTR))
-                    != 0,
+                read: (shdr.sh_flags & u64::from(SHF_ALLOC)) != 0,
+                write: (shdr.sh_flags & u64::from(SHF_WRITE)) != 0,
+                execute: (shdr.sh_flags & u64::from(SHF_EXECINSTR)) != 0,
             };
 
-            let sha256 = compute_section_hash(
-                data, raw_offset, raw_size,
-            );
+            let sha256 = compute_section_hash(data, raw_offset, raw_size);
 
             SectionInfo {
                 name,
@@ -267,11 +220,9 @@ fn build_segments(elf: &Elf) -> Vec<SegmentInfo> {
 }
 
 fn build_elf_info(elf: &Elf) -> ElfInfo {
-    let os_abi =
-        os_abi_name(elf.header.e_ident[EI_OSABI]);
+    let os_abi = os_abi_name(elf.header.e_ident[EI_OSABI]);
     let elf_type = elf_type_name(elf.header.e_type);
-    let interpreter =
-        elf.interpreter.map(|s| s.to_string());
+    let interpreter = elf.interpreter.map(|s| s.to_string());
 
     let gnu_relro = elf
         .program_headers
@@ -287,23 +238,17 @@ fn build_elf_info(elf: &Elf) -> ElfInfo {
     let mut bind_now = false;
     if let Some(dynamic) = &elf.dynamic {
         for dyn_entry in &dynamic.dyns {
-            let tag = dyn_entry.d_tag as u64;
+            let tag = dyn_entry.d_tag;
             if tag == DT_BIND_NOW {
                 bind_now = true;
             }
-            if tag == DT_FLAGS
-                && (dyn_entry.d_val & DF_BIND_NOW) != 0
-            {
+            if tag == DT_FLAGS && (dyn_entry.d_val & DF_BIND_NOW) != 0 {
                 bind_now = true;
             }
         }
     }
 
-    let needed_libraries = elf
-        .libraries
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let needed_libraries = elf.libraries.iter().map(|s| s.to_string()).collect();
 
     ElfInfo {
         os_abi,
@@ -316,19 +261,12 @@ fn build_elf_info(elf: &Elf) -> ElfInfo {
     }
 }
 
-fn collect_function_hints(
-    elf: &Elf,
-    entry_point: u64,
-) -> Vec<u64> {
+fn collect_function_hints(elf: &Elf, entry_point: u64) -> Vec<u64> {
     let mut hints: Vec<u64> = elf
         .syms
         .iter()
         .chain(elf.dynsyms.iter())
-        .filter(|sym| {
-            sym.st_type() == STT_FUNC
-                && sym.st_value != 0
-                && sym.st_value != entry_point
-        })
+        .filter(|sym| sym.st_type() == STT_FUNC && sym.st_value != 0 && sym.st_value != entry_point)
         .map(|sym| sym.st_value)
         .collect();
     hints.sort_unstable();

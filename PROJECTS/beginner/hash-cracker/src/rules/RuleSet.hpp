@@ -17,7 +17,7 @@ Connects to:
 #include <string_view>
 
 class RuleSet {
-public:
+  public:
     static std::generator<std::string> capitalize_first(std::string_view word);
     static std::generator<std::string> uppercase_all(std::string_view word);
     static std::generator<std::string> leet_speak(std::string_view word);

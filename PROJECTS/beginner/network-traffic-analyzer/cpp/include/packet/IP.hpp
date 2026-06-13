@@ -21,8 +21,8 @@ class IP_class {
 	std::string dst;
 
   public:
-	std::string get_source();
-	std::string get_dest();
+	const std::string &get_source() const;
+	const std::string &get_dest() const;
 	// getters
 	/*virtual std::string get_source() = 0;
 	virtual std::string get_dest() = 0;*/

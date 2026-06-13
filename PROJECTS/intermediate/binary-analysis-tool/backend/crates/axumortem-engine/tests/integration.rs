@@ -20,24 +20,19 @@
 //   lib.rs   - AnalysisEngine
 //   types.rs - BinaryFormat
 
-use axumortem_engine::types::BinaryFormat;
 use axumortem_engine::AnalysisEngine;
+use axumortem_engine::types::BinaryFormat;
 
 fn load_fixture(name: &str) -> Vec<u8> {
-    let path = format!(
-        "{}/tests/fixtures/{name}",
-        env!("CARGO_MANIFEST_DIR"),
-    );
-    std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("fixture {path}: {e}"))
+    let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+    std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
 }
 
 #[test]
 fn full_pipeline_elf() {
     let engine = AnalysisEngine::new().unwrap();
     let data = load_fixture("hello_elf");
-    let (ctx, report) =
-        engine.analyze(&data, "hello_elf");
+    let (ctx, report) = engine.analyze(&data, "hello_elf");
 
     assert!(
         report.all_succeeded(),
@@ -58,8 +53,7 @@ fn full_pipeline_elf() {
     assert!(ctx.entropy_result.is_some());
     assert!(ctx.disassembly_result.is_some());
 
-    let disasm =
-        ctx.disassembly_result.as_ref().unwrap();
+    let disasm = ctx.disassembly_result.as_ref().unwrap();
     assert!(disasm.total_functions > 0);
     assert!(disasm.total_instructions > 0);
 
@@ -73,8 +67,7 @@ fn full_pipeline_elf() {
 fn full_pipeline_stripped_elf() {
     let engine = AnalysisEngine::new().unwrap();
     let data = load_fixture("hello_elf_stripped");
-    let (ctx, report) =
-        engine.analyze(&data, "hello_elf_stripped");
+    let (ctx, report) = engine.analyze(&data, "hello_elf_stripped");
 
     assert!(report.all_succeeded());
 
@@ -98,15 +91,11 @@ fn sha256_computed_correctly() {
 fn invalid_binary_handled() {
     let engine = AnalysisEngine::new().unwrap();
     let data = vec![0xDE, 0xAD, 0xBE, 0xEF];
-    let (_, report) =
-        engine.analyze(&data, "garbage.bin");
+    let (_, report) = engine.analyze(&data, "garbage.bin");
 
     assert!(
         !report.all_succeeded(),
         "invalid binary should cause format pass failure"
     );
-    assert!(report
-        .failed_passes()
-        .iter()
-        .any(|p| p.name == "format"));
+    assert!(report.failed_passes().iter().any(|p| p.name == "format"));
 }

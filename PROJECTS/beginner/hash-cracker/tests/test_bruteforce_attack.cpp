@@ -13,8 +13,8 @@ Connects to:
   attack/BruteForceAttack.hpp - BruteForceAttack tested
 */
 
-#include <gtest/gtest.h>
 #include "src/attack/BruteForceAttack.hpp"
+#include <gtest/gtest.h>
 #include <set>
 #include <vector>
 
@@ -42,8 +42,12 @@ TEST(BruteForceAttackTest, PartitionsKeyspace) {
     BruteForceAttack p0("ab", 2, 0, 2);
     BruteForceAttack p1("ab", 2, 1, 2);
     std::set<std::string> all;
-    while (auto c = p0.next()) { all.insert(*c); }
-    while (auto c = p1.next()) { all.insert(*c); }
+    while (auto c = p0.next()) {
+        all.insert(*c);
+    }
+    while (auto c = p1.next()) {
+        all.insert(*c);
+    }
     EXPECT_EQ(all.size(), 6);
 }
 

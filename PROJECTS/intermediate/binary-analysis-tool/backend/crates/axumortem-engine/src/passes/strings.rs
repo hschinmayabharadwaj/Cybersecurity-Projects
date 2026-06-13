@@ -70,23 +70,14 @@ const SUSPICIOUS_CATEGORIES: &[StringCategory] = &[
     StringCategory::CryptoWallet,
 ];
 
-const URL_PREFIXES: &[&str] =
-    &["http://", "https://", "ftp://"];
+const URL_PREFIXES: &[&str] = &["http://", "https://", "ftp://"];
 
 const UNIX_PATH_PREFIXES: &[&str] = &[
-    "/etc/", "/tmp/", "/var/", "/bin/", "/usr/",
-    "/dev/", "/proc/", "/sys/", "/opt/", "/home/",
+    "/etc/", "/tmp/", "/var/", "/bin/", "/usr/", "/dev/", "/proc/", "/sys/", "/opt/", "/home/",
     "/root/", "/lib/", "/sbin/",
 ];
 
-const REGISTRY_PREFIXES: &[&str] = &[
-    "HKEY_",
-    "HKLM\\",
-    "HKCU\\",
-    "HKCR\\",
-    "HKCC\\",
-    "HKU\\",
-];
+const REGISTRY_PREFIXES: &[&str] = &["HKEY_", "HKLM\\", "HKCU\\", "HKCR\\", "HKCC\\", "HKU\\"];
 
 const SHELL_INDICATORS: &[&str] = &[
     "cmd.exe",
@@ -108,8 +99,7 @@ const SHELL_INDICATORS: &[&str] = &[
 ];
 
 const PACKER_SIGNATURES: &[&str] = &[
-    "UPX!", "MPRESS", ".themida", ".vmp", ".enigma",
-    "PEC2", "ASPack", "MEW ",
+    "UPX!", "MPRESS", ".themida", ".vmp", ".enigma", "PEC2", "ASPack", "MEW ",
 ];
 
 const DEBUG_ARTIFACTS: &[&str] = &[
@@ -163,8 +153,7 @@ const PERSISTENCE_PATHS: &[&str] = &[
     ".config/autostart",
 ];
 
-const BASE64_CHARS: &[u8] =
-    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 const BASE64_MIN_LENGTH: usize = 20;
 
@@ -215,25 +204,15 @@ impl AnalysisPass for StringPass {
         &["format"]
     }
 
-    fn run(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> Result<(), EngineError> {
-        let sections = ctx
-            .format_result
-            .as_ref()
-            .map(|fr| fr.sections.as_slice());
-        let result =
-            extract_strings(ctx.data(), sections);
+    fn run(&self, ctx: &mut AnalysisContext) -> Result<(), EngineError> {
+        let sections = ctx.format_result.as_ref().map(|fr| fr.sections.as_slice());
+        let result = extract_strings(ctx.data(), sections);
         ctx.string_result = Some(result);
         Ok(())
     }
 }
 
-fn extract_strings(
-    data: &[u8],
-    sections: Option<&[SectionInfo]>,
-) -> StringResult {
+fn extract_strings(data: &[u8], sections: Option<&[SectionInfo]>) -> StringResult {
     let mut strings = Vec::new();
 
     extract_ascii(data, sections, &mut strings);
@@ -244,12 +223,8 @@ fn extract_strings(
     let mut suspicious_count = 0;
 
     for s in &strings {
-        *by_encoding
-            .entry(s.encoding.clone())
-            .or_insert(0) += 1;
-        *by_category
-            .entry(s.category.clone())
-            .or_insert(0) += 1;
+        *by_encoding.entry(s.encoding.clone()).or_insert(0) += 1;
+        *by_category.entry(s.category.clone()).or_insert(0) += 1;
         if s.is_suspicious {
             suspicious_count += 1;
         }
@@ -270,17 +245,10 @@ fn extract_strings(
 }
 
 fn is_printable(b: u8) -> bool {
-    (PRINTABLE_MIN..=PRINTABLE_MAX).contains(&b)
-        || b == TAB
-        || b == NEWLINE
-        || b == CARRIAGE_RETURN
+    (PRINTABLE_MIN..=PRINTABLE_MAX).contains(&b) || b == TAB || b == NEWLINE || b == CARRIAGE_RETURN
 }
 
-fn extract_ascii(
-    data: &[u8],
-    sections: Option<&[SectionInfo]>,
-    out: &mut Vec<ExtractedString>,
-) {
+fn extract_ascii(data: &[u8], sections: Option<&[SectionInfo]>, out: &mut Vec<ExtractedString>) {
     let mut start = 0;
     let mut in_run = false;
 
@@ -292,61 +260,18 @@ fn extract_ascii(
             }
         } else if in_run {
             let len = i - start;
-            if len >= MIN_STRING_LENGTH {
-                if let Ok(s) =
-                    std::str::from_utf8(&data[start..i])
-                {
-                    let is_multibyte = s
-                        .bytes()
-                        .any(|b| !b.is_ascii());
-                    let encoding = if is_multibyte {
-                        StringEncoding::Utf8
-                    } else {
-                        StringEncoding::Ascii
-                    };
-                    let category = classify(s);
-                    let is_suspicious =
-                        is_category_suspicious(&category);
-                    let section = sections.and_then(|secs| {
-                        find_section(
-                            secs,
-                            start as u64,
-                        )
-                    });
-                    out.push(ExtractedString {
-                        value: s.to_string(),
-                        offset: start as u64,
-                        encoding,
-                        length: len,
-                        category,
-                        is_suspicious,
-                        section,
-                    });
-                }
-            }
-            in_run = false;
-        }
-    }
-
-    if in_run {
-        let len = data.len() - start;
-        if len >= MIN_STRING_LENGTH {
-            if let Ok(s) =
-                std::str::from_utf8(&data[start..])
+            if len >= MIN_STRING_LENGTH
+                && let Ok(s) = std::str::from_utf8(&data[start..i])
             {
-                let is_multibyte =
-                    s.bytes().any(|b| !b.is_ascii());
+                let is_multibyte = s.bytes().any(|b| !b.is_ascii());
                 let encoding = if is_multibyte {
                     StringEncoding::Utf8
                 } else {
                     StringEncoding::Ascii
                 };
                 let category = classify(s);
-                let is_suspicious =
-                    is_category_suspicious(&category);
-                let section = sections.and_then(|secs| {
-                    find_section(secs, start as u64)
-                });
+                let is_suspicious = is_category_suspicious(&category);
+                let section = sections.and_then(|secs| find_section(secs, start as u64));
                 out.push(ExtractedString {
                     value: s.to_string(),
                     offset: start as u64,
@@ -357,15 +282,38 @@ fn extract_ascii(
                     section,
                 });
             }
+            in_run = false;
+        }
+    }
+
+    if in_run {
+        let len = data.len() - start;
+        if len >= MIN_STRING_LENGTH
+            && let Ok(s) = std::str::from_utf8(&data[start..])
+        {
+            let is_multibyte = s.bytes().any(|b| !b.is_ascii());
+            let encoding = if is_multibyte {
+                StringEncoding::Utf8
+            } else {
+                StringEncoding::Ascii
+            };
+            let category = classify(s);
+            let is_suspicious = is_category_suspicious(&category);
+            let section = sections.and_then(|secs| find_section(secs, start as u64));
+            out.push(ExtractedString {
+                value: s.to_string(),
+                offset: start as u64,
+                encoding,
+                length: len,
+                category,
+                is_suspicious,
+                section,
+            });
         }
     }
 }
 
-fn extract_utf16le(
-    data: &[u8],
-    sections: Option<&[SectionInfo]>,
-    out: &mut Vec<ExtractedString>,
-) {
+fn extract_utf16le(data: &[u8], sections: Option<&[SectionInfo]>, out: &mut Vec<ExtractedString>) {
     let mut i = 0;
     while i + 1 < data.len() {
         let lo = data[i];
@@ -391,14 +339,10 @@ fn extract_utf16le(
             }
 
             if code_units.len() >= MIN_STRING_LENGTH {
-                let value =
-                    String::from_utf16_lossy(&code_units);
+                let value = String::from_utf16_lossy(&code_units);
                 let category = classify(&value);
-                let is_suspicious =
-                    is_category_suspicious(&category);
-                let section = sections.and_then(|secs| {
-                    find_section(secs, start as u64)
-                });
+                let is_suspicious = is_category_suspicious(&category);
+                let section = sections.and_then(|secs| find_section(secs, start as u64));
                 out.push(ExtractedString {
                     value,
                     offset: start as u64,
@@ -417,17 +361,11 @@ fn extract_utf16le(
     }
 }
 
-fn find_section(
-    sections: &[SectionInfo],
-    file_offset: u64,
-) -> Option<String> {
+fn find_section(sections: &[SectionInfo], file_offset: u64) -> Option<String> {
     sections
         .iter()
         .find(|s| {
-            s.raw_size > 0
-                && file_offset >= s.raw_offset
-                && file_offset
-                    < s.raw_offset + s.raw_size
+            s.raw_size > 0 && file_offset >= s.raw_offset && file_offset < s.raw_offset + s.raw_size
         })
         .map(|s| s.name.clone())
 }
@@ -475,17 +413,13 @@ fn classify(s: &str) -> StringCategory {
     StringCategory::Generic
 }
 
-fn is_category_suspicious(
-    category: &StringCategory,
-) -> bool {
+fn is_category_suspicious(category: &StringCategory) -> bool {
     SUSPICIOUS_CATEGORIES.contains(category)
 }
 
 fn is_url(s: &str) -> bool {
     let lower = s.to_ascii_lowercase();
-    URL_PREFIXES
-        .iter()
-        .any(|prefix| lower.starts_with(prefix))
+    URL_PREFIXES.iter().any(|prefix| lower.starts_with(prefix))
 }
 
 fn is_ip_address(s: &str) -> bool {
@@ -521,9 +455,7 @@ fn is_file_path(s: &str) -> bool {
 }
 
 fn is_registry_key(s: &str) -> bool {
-    REGISTRY_PREFIXES
-        .iter()
-        .any(|prefix| s.starts_with(prefix))
+    REGISTRY_PREFIXES.iter().any(|prefix| s.starts_with(prefix))
 }
 
 fn is_shell_command(s: &str) -> bool {
@@ -537,11 +469,10 @@ fn is_crypto_wallet(s: &str) -> bool {
     if s.len() >= BTC_MIN_LENGTH
         && s.len() <= BTC_MAX_LENGTH
         && (s.starts_with('1') || s.starts_with('3'))
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric())
-        && !s.chars().any(|c| {
-            c == '0' || c == 'O' || c == 'I' || c == 'l'
-        })
+        && s.chars().all(|c| c.is_ascii_alphanumeric())
+        && !s
+            .chars()
+            .any(|c| c == '0' || c == 'O' || c == 'I' || c == 'l')
     {
         return true;
     }
@@ -572,51 +503,35 @@ fn is_email(s: &str) -> bool {
         return false;
     }
     let local = &s[..at_pos];
-    local
+    local.chars().all(|c| {
+        c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '%' || c == '+' || c == '-'
+    }) && domain[..dot_pos]
         .chars()
-        .all(|c| c.is_ascii_alphanumeric()
-            || c == '.'
-            || c == '_'
-            || c == '%'
-            || c == '+'
-            || c == '-')
-        && domain[..dot_pos]
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric()
-                || c == '.'
-                || c == '-')
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
         && tld.chars().all(|c| c.is_ascii_alphabetic())
 }
 
 fn is_suspicious_api(s: &str) -> bool {
-    SUSPICIOUS_APIS
-        .iter()
-        .any(|api| s == api.name)
+    SUSPICIOUS_APIS.iter().any(|api| s == api.name)
 }
 
 fn is_packer_signature(s: &str) -> bool {
-    PACKER_SIGNATURES
-        .iter()
-        .any(|sig| s.contains(sig))
+    PACKER_SIGNATURES.iter().any(|sig| s.contains(sig))
 }
 
 fn is_debug_artifact(s: &str) -> bool {
-    DEBUG_ARTIFACTS
-        .iter()
-        .any(|artifact| s.contains(artifact))
+    DEBUG_ARTIFACTS.iter().any(|artifact| s.contains(artifact))
 }
 
 fn is_anti_analysis(s: &str) -> bool {
     let lower = s.to_ascii_lowercase();
-    ANTI_ANALYSIS_INDICATORS.iter().any(|indicator| {
-        lower.contains(&indicator.to_ascii_lowercase())
-    })
+    ANTI_ANALYSIS_INDICATORS
+        .iter()
+        .any(|indicator| lower.contains(&indicator.to_ascii_lowercase()))
 }
 
 fn is_persistence_path(s: &str) -> bool {
-    PERSISTENCE_PATHS
-        .iter()
-        .any(|path| s.contains(path))
+    PERSISTENCE_PATHS.iter().any(|path| s.contains(path))
 }
 
 fn is_encoded_data(s: &str) -> bool {
@@ -627,9 +542,7 @@ fn is_encoded_data(s: &str) -> bool {
     if trimmed.is_empty() {
         return false;
     }
-    let all_base64 = trimmed
-        .bytes()
-        .all(|b| BASE64_CHARS.contains(&b));
+    let all_base64 = trimmed.bytes().all(|b| BASE64_CHARS.contains(&b));
     if !all_base64 {
         return false;
     }
@@ -645,13 +558,8 @@ mod tests {
     use crate::context::BinarySource;
 
     fn load_fixture(name: &str) -> Vec<u8> {
-        let path = format!(
-            "{}/tests/fixtures/{name}",
-            env!("CARGO_MANIFEST_DIR"),
-        );
-        std::fs::read(&path).unwrap_or_else(|e| {
-            panic!("fixture {path}: {e}")
-        })
+        let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
     }
 
     fn make_ctx(data: Vec<u8>) -> AnalysisContext {
@@ -666,23 +574,12 @@ mod tests {
 
     #[test]
     fn ascii_extraction_min_length() {
-        let data =
-            b"abc\x00abcdef\x00ab\x00longstring\x00";
+        let data = b"abc\x00abcdef\x00ab\x00longstring\x00";
         let result = extract_strings(data, None);
 
-        let values: Vec<&str> = result
-            .strings
-            .iter()
-            .map(|s| s.value.as_str())
-            .collect();
-        assert!(
-            !values.contains(&"abc"),
-            "3-char string should be excluded"
-        );
-        assert!(
-            !values.contains(&"ab"),
-            "2-char string should be excluded"
-        );
+        let values: Vec<&str> = result.strings.iter().map(|s| s.value.as_str()).collect();
+        assert!(!values.contains(&"abc"), "3-char string should be excluded");
+        assert!(!values.contains(&"ab"), "2-char string should be excluded");
         assert!(
             values.contains(&"abcdef"),
             "6-char string should be included"
@@ -704,57 +601,28 @@ mod tests {
         data.push(0x00);
 
         let result = extract_strings(&data, None);
-        let utf16_strings: Vec<&ExtractedString> =
-            result
-                .strings
-                .iter()
-                .filter(|s| {
-                    s.encoding == StringEncoding::Utf16Le
-                })
-                .collect();
-        assert!(
-            !utf16_strings.is_empty(),
-            "should extract UTF-16LE string"
-        );
-        assert!(utf16_strings
+        let utf16_strings: Vec<&ExtractedString> = result
+            .strings
             .iter()
-            .any(|s| s.value.contains("Hello")));
+            .filter(|s| s.encoding == StringEncoding::Utf16Le)
+            .collect();
+        assert!(!utf16_strings.is_empty(), "should extract UTF-16LE string");
+        assert!(utf16_strings.iter().any(|s| s.value.contains("Hello")));
     }
 
     #[test]
     fn category_url() {
-        assert_eq!(
-            classify("https://evil.com/payload"),
-            StringCategory::Url,
-        );
-        assert_eq!(
-            classify("http://malware.ru/dropper"),
-            StringCategory::Url,
-        );
-        assert_eq!(
-            classify("ftp://files.example.com"),
-            StringCategory::Url,
-        );
+        assert_eq!(classify("https://evil.com/payload"), StringCategory::Url,);
+        assert_eq!(classify("http://malware.ru/dropper"), StringCategory::Url,);
+        assert_eq!(classify("ftp://files.example.com"), StringCategory::Url,);
     }
 
     #[test]
     fn category_ip_address() {
-        assert_eq!(
-            classify("192.168.1.1"),
-            StringCategory::IpAddress,
-        );
-        assert_eq!(
-            classify("10.0.0.1"),
-            StringCategory::IpAddress,
-        );
-        assert_ne!(
-            classify("999.999.999.999"),
-            StringCategory::IpAddress,
-        );
-        assert_ne!(
-            classify("1.2.3"),
-            StringCategory::IpAddress,
-        );
+        assert_eq!(classify("192.168.1.1"), StringCategory::IpAddress,);
+        assert_eq!(classify("10.0.0.1"), StringCategory::IpAddress,);
+        assert_ne!(classify("999.999.999.999"), StringCategory::IpAddress,);
+        assert_ne!(classify("1.2.3"), StringCategory::IpAddress,);
     }
 
     #[test]
@@ -763,10 +631,7 @@ mod tests {
             classify("HKLM\\Software\\Microsoft"),
             StringCategory::RegistryKey,
         );
-        assert_eq!(
-            classify("HKEY_LOCAL_MACHINE"),
-            StringCategory::RegistryKey,
-        );
+        assert_eq!(classify("HKEY_LOCAL_MACHINE"), StringCategory::RegistryKey,);
     }
 
     #[test]
@@ -775,22 +640,13 @@ mod tests {
             classify("C:\\Windows\\System32\\notepad.exe"),
             StringCategory::FilePath,
         );
-        assert_eq!(
-            classify("/tmp/output.log"),
-            StringCategory::FilePath,
-        );
-        assert_eq!(
-            classify("\\\\server\\share"),
-            StringCategory::FilePath,
-        );
+        assert_eq!(classify("/tmp/output.log"), StringCategory::FilePath,);
+        assert_eq!(classify("\\\\server\\share"), StringCategory::FilePath,);
     }
 
     #[test]
     fn category_shell_command() {
-        assert_eq!(
-            classify("cmd.exe /c whoami"),
-            StringCategory::ShellCommand,
-        );
+        assert_eq!(classify("cmd.exe /c whoami"), StringCategory::ShellCommand,);
         assert_eq!(
             classify("/bin/bash -c echo hi"),
             StringCategory::ShellCommand,
@@ -799,10 +655,7 @@ mod tests {
 
     #[test]
     fn category_packer_signature() {
-        assert_eq!(
-            classify("UPX!"),
-            StringCategory::PackerSignature,
-        );
+        assert_eq!(classify("UPX!"), StringCategory::PackerSignature,);
         assert_eq!(
             classify("This is .themida packed"),
             StringCategory::PackerSignature,
@@ -815,10 +668,7 @@ mod tests {
             classify("VMware Virtual Platform"),
             StringCategory::AntiAnalysis,
         );
-        assert_eq!(
-            classify("wireshark.exe"),
-            StringCategory::AntiAnalysis,
-        );
+        assert_eq!(classify("wireshark.exe"), StringCategory::AntiAnalysis,);
     }
 
     #[test]
@@ -830,63 +680,34 @@ mod tests {
             ),
             StringCategory::PersistencePath,
         );
-        assert_eq!(
-            classify("/etc/crontab"),
-            StringCategory::PersistencePath,
-        );
+        assert_eq!(classify("/etc/crontab"), StringCategory::PersistencePath,);
     }
 
     #[test]
     fn category_encoded_data() {
         assert_eq!(
-            classify(
-                "SGVsbG8gV29ybGQhIFRoaXMgaXM="
-            ),
+            classify("SGVsbG8gV29ybGQhIFRoaXMgaXM="),
             StringCategory::EncodedData,
         );
-        assert_ne!(
-            classify("short"),
-            StringCategory::EncodedData,
-        );
+        assert_ne!(classify("short"), StringCategory::EncodedData,);
     }
 
     #[test]
     fn category_email() {
-        assert_eq!(
-            classify("user@example.com"),
-            StringCategory::Email,
-        );
+        assert_eq!(classify("user@example.com"), StringCategory::Email,);
     }
 
     #[test]
     fn suspicious_flag_by_category() {
-        assert!(is_category_suspicious(
-            &StringCategory::ShellCommand
-        ));
-        assert!(is_category_suspicious(
-            &StringCategory::AntiAnalysis
-        ));
-        assert!(is_category_suspicious(
-            &StringCategory::PackerSignature
-        ));
-        assert!(is_category_suspicious(
-            &StringCategory::PersistencePath
-        ));
-        assert!(is_category_suspicious(
-            &StringCategory::EncodedData
-        ));
-        assert!(is_category_suspicious(
-            &StringCategory::CryptoWallet
-        ));
-        assert!(is_category_suspicious(
-            &StringCategory::SuspiciousApi
-        ));
-        assert!(!is_category_suspicious(
-            &StringCategory::Generic
-        ));
-        assert!(!is_category_suspicious(
-            &StringCategory::Url
-        ));
+        assert!(is_category_suspicious(&StringCategory::ShellCommand));
+        assert!(is_category_suspicious(&StringCategory::AntiAnalysis));
+        assert!(is_category_suspicious(&StringCategory::PackerSignature));
+        assert!(is_category_suspicious(&StringCategory::PersistencePath));
+        assert!(is_category_suspicious(&StringCategory::EncodedData));
+        assert!(is_category_suspicious(&StringCategory::CryptoWallet));
+        assert!(is_category_suspicious(&StringCategory::SuspiciousApi));
+        assert!(!is_category_suspicious(&StringCategory::Generic));
+        assert!(!is_category_suspicious(&StringCategory::Url));
     }
 
     #[test]
@@ -919,12 +740,11 @@ mod tests {
             virtual_size: 100,
             raw_offset: 10,
             raw_size: 100,
-            permissions:
-                crate::types::SectionPermissions {
-                    read: true,
-                    write: false,
-                    execute: false,
-                },
+            permissions: crate::types::SectionPermissions {
+                read: true,
+                write: false,
+                execute: false,
+            },
             sha256: String::new(),
         }];
 

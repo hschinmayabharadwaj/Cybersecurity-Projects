@@ -1,0 +1,16 @@
+# ©AngelaMos | 2026
+# .ameba.yml
+#
+# Disabled rules document intentional patterns in this codebase
+# - Naming/BlockParameterName: idiomatic Crystal uses short block params like |c|, |b|
+# - Lint/NotNil: .not_nil! used as explicit runtime contract assertion after upstream
+#   validation; raising NilAssertionError is the desired crash mode for misconfiguration
+# Raised thresholds match the natural shape of dispatch/subscriber handlers
+Naming/BlockParameterName:
+  Enabled: false
+
+Lint/NotNil:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  MaxComplexity: 20

@@ -59,7 +59,7 @@ module CRE::Engine
         @persistence.rotations.update_state(rotation_id, Persistence::RotationState::Applying)
         @bus.publish Events::RotationStepCompleted.new(c.id, rotation_id, :generate)
 
-        current_step = :apply
+        current_step = :apply # ameba:disable Lint/UselessAssign — read in rescue
         @bus.publish Events::RotationStepStarted.new(c.id, rotation_id, :apply)
         rotator.apply(c, new_secret)
         @persistence.rotations.update_state(rotation_id, Persistence::RotationState::Verifying)
@@ -83,8 +83,8 @@ module CRE::Engine
         if (ns = new_secret) && (current_step == :apply || current_step == :verify)
           begin
             rotator.rollback_apply(c, ns)
-          rescue rb
-            Log.error(exception: rb) { "rollback_apply failed for credential #{c.id}" }
+          rescue error
+            Log.error(exception: error) { "rollback_apply failed for credential #{c.id}" }
           end
         end
         finalize_failure(c, rotation_id, current_step, ex)

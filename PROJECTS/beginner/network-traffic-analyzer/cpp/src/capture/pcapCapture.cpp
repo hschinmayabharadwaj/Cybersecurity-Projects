@@ -112,7 +112,7 @@ void PcapCapture::stop() {
 /* print all available interfaces */
 void PcapCapture::print_interfaces() {
 	int i = 0;
-	for (pcap_if_t *dev = interfaces; dev != nullptr; dev = dev->next) {
+	for (const pcap_if_t *dev = interfaces; dev != nullptr; dev = dev->next) {
 		printf("%d. %s  ", ++i, dev->name);
 		if (dev->description != nullptr) {
 			printf("(%s)\n", dev->description);
@@ -132,7 +132,7 @@ void PcapCapture::print_interfaces() {
  * @param packet Raw packet bytes
  */
 void PcapCapture::callback(u_char *user, const struct pcap_pkthdr *header, const u_char *packet) {
-	auto * const self = reinterpret_cast<PcapCapture *>(user);
+	auto *const self = reinterpret_cast<PcapCapture *>(user);
 	if (!self->isRunning()) {
 		return;
 	}

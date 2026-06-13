@@ -52,10 +52,7 @@ export function SessionsPage() {
                 return (
                   <tr key={s.id}>
                     <td>
-                      <Link
-                        to={`/sessions/${s.id}`}
-                        className={styles.link}
-                      >
+                      <Link to={`/sessions/${s.id}`} className={styles.link}>
                         {s.id.slice(0, 8)}
                       </Link>
                     </td>
@@ -67,9 +64,7 @@ export function SessionsPage() {
                     <td>{s.command_count}</td>
                     <td className={styles.threat}>{s.threat_score}</td>
                     <td>{new Date(s.started_at).toLocaleString()}</td>
-                    <td>
-                      {duration !== null ? `${duration}s` : 'active'}
-                    </td>
+                    <td>{duration !== null ? `${duration}s` : 'active'}</td>
                   </tr>
                 )
               })}
@@ -81,15 +76,12 @@ export function SessionsPage() {
               type="button"
               className={styles.pageBtn}
               disabled={offset === 0}
-              onClick={() =>
-                setOffset(Math.max(0, offset - PAGE_SIZE))
-              }
+              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
             >
               &#9664; PREV
             </button>
             <span className={styles.pageInfo}>
-              {offset + 1}&ndash;{Math.min(offset + PAGE_SIZE, total)}{' '}
-              OF {total}
+              {offset + 1}&ndash;{Math.min(offset + PAGE_SIZE, total)} OF {total}
             </span>
             <button
               type="button"

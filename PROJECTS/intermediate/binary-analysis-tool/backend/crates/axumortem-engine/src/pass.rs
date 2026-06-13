@@ -33,10 +33,7 @@ mod private {
 pub trait AnalysisPass: private::Sealed + Send + Sync {
     fn name(&self) -> &'static str;
     fn dependencies(&self) -> &[&'static str];
-    fn run(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> Result<(), EngineError>;
+    fn run(&self, ctx: &mut AnalysisContext) -> Result<(), EngineError>;
 }
 
 #[derive(Debug, Clone)]
@@ -58,10 +55,7 @@ impl PassReport {
     }
 
     pub fn failed_passes(&self) -> Vec<&PassOutcome> {
-        self.outcomes
-            .iter()
-            .filter(|o| !o.success)
-            .collect()
+        self.outcomes.iter().filter(|o| !o.success).collect()
     }
 }
 
@@ -71,33 +65,23 @@ pub struct PassManager {
 }
 
 impl PassManager {
-    pub fn new(
-        passes: Vec<Box<dyn AnalysisPass>>,
-    ) -> Self {
+    pub fn new(passes: Vec<Box<dyn AnalysisPass>>) -> Self {
         let order = topological_order(&passes);
         Self { passes, order }
     }
 
-    pub fn run_all(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> PassReport {
+    pub fn run_all(&self, ctx: &mut AnalysisContext) -> PassReport {
         let mut outcomes = Vec::with_capacity(self.passes.len());
 
         for &idx in &self.order {
             let pass = &self.passes[idx];
             let start = Instant::now();
             let result = pass.run(ctx);
-            let duration_ms =
-                start.elapsed().as_millis() as u64;
+            let duration_ms = start.elapsed().as_millis() as u64;
 
             let outcome = match result {
                 Ok(()) => {
-                    tracing::info!(
-                        pass = pass.name(),
-                        duration_ms,
-                        "pass completed"
-                    );
+                    tracing::info!(pass = pass.name(), duration_ms, "pass completed");
                     PassOutcome {
                         name: pass.name(),
                         success: true,
@@ -128,9 +112,7 @@ impl PassManager {
     }
 }
 
-fn topological_order(
-    passes: &[Box<dyn AnalysisPass>],
-) -> Vec<usize> {
+fn topological_order(passes: &[Box<dyn AnalysisPass>]) -> Vec<usize> {
     let name_to_idx: HashMap<&str, usize> = passes
         .iter()
         .enumerate()
@@ -143,8 +125,7 @@ fn topological_order(
 
     for (idx, pass) in passes.iter().enumerate() {
         for dep_name in pass.dependencies() {
-            if let Some(&dep_idx) = name_to_idx.get(dep_name)
-            {
+            if let Some(&dep_idx) = name_to_idx.get(dep_name) {
                 adjacency[dep_idx].push(idx);
                 in_degree[idx] += 1;
             }
@@ -204,10 +185,7 @@ mod tests {
             &self.deps
         }
 
-        fn run(
-            &self,
-            _ctx: &mut AnalysisContext,
-        ) -> Result<(), EngineError> {
+        fn run(&self, _ctx: &mut AnalysisContext) -> Result<(), EngineError> {
             self.log.lock().unwrap().push(self.name);
             if self.should_fail {
                 return Err(EngineError::PassFailed {
@@ -221,9 +199,7 @@ mod tests {
 
     fn make_ctx() -> AnalysisContext {
         AnalysisContext::new(
-            crate::context::BinarySource::Buffered(
-                Arc::from(vec![0u8; 4]),
-            ),
+            crate::context::BinarySource::Buffered(Arc::from(vec![0u8; 4])),
             "deadbeef".into(),
             "test.bin".into(),
             4,
@@ -295,16 +271,10 @@ mod tests {
         let report = manager.run_all(&mut ctx);
 
         let execution_order = log.lock().unwrap().clone();
-        assert_eq!(
-            execution_order,
-            vec!["first", "second", "third"]
-        );
+        assert_eq!(execution_order, vec!["first", "second", "third"]);
         assert!(!report.all_succeeded());
         assert_eq!(report.failed_passes().len(), 1);
-        assert_eq!(
-            report.failed_passes()[0].name,
-            "second"
-        );
+        assert_eq!(report.failed_passes()[0].name, "second");
     }
 
     #[test]
@@ -343,14 +313,10 @@ mod tests {
         manager.run_all(&mut ctx);
 
         let order = log.lock().unwrap().clone();
-        let format_pos =
-            order.iter().position(|&n| n == "format").unwrap();
-        let imports_pos =
-            order.iter().position(|&n| n == "imports").unwrap();
-        let entropy_pos =
-            order.iter().position(|&n| n == "entropy").unwrap();
-        let score_pos =
-            order.iter().position(|&n| n == "score").unwrap();
+        let format_pos = order.iter().position(|&n| n == "format").unwrap();
+        let imports_pos = order.iter().position(|&n| n == "imports").unwrap();
+        let entropy_pos = order.iter().position(|&n| n == "entropy").unwrap();
+        let score_pos = order.iter().position(|&n| n == "score").unwrap();
 
         assert!(format_pos < imports_pos);
         assert!(format_pos < entropy_pos);
@@ -385,14 +351,12 @@ mod tests {
     fn reports_duration() {
         let log = Arc::new(Mutex::new(Vec::new()));
 
-        let passes: Vec<Box<dyn AnalysisPass>> = vec![
-            Box::new(MockPass {
-                name: "fast",
-                deps: vec![],
-                log: Arc::clone(&log),
-                should_fail: false,
-            }),
-        ];
+        let passes: Vec<Box<dyn AnalysisPass>> = vec![Box::new(MockPass {
+            name: "fast",
+            deps: vec![],
+            log: Arc::clone(&log),
+            should_fail: false,
+        })];
 
         let manager = PassManager::new(passes);
         let mut ctx = make_ctx();

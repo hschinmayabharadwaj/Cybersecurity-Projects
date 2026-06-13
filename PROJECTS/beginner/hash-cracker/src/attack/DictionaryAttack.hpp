@@ -14,23 +14,23 @@ Connects to:
 
 #pragma once
 
+#include "src/core/Concepts.hpp"
+#include "src/io/MappedFile.hpp"
 #include <cstddef>
 #include <expected>
 #include <string>
 #include <string_view>
-#include "src/core/Concepts.hpp"
-#include "src/io/MappedFile.hpp"
 
 class DictionaryAttack {
-public:
-    static std::expected<DictionaryAttack, CrackError> create(
-        std::string_view path, unsigned thread_index, unsigned total_threads);
+  public:
+    static std::expected<DictionaryAttack, CrackError>
+    create(std::string_view path, unsigned thread_index, unsigned total_threads);
 
     std::expected<std::string, AttackComplete> next();
     std::size_t total() const;
     std::size_t progress() const;
 
-private:
+  private:
     DictionaryAttack() = default;
 
     MappedFile file_;

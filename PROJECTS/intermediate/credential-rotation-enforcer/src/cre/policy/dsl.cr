@@ -25,7 +25,7 @@ module CRE::Policy::Dsl
   # `enforce :rotate_immediatly` fail at compile time. Splat-symbol args
   # (`notify_via :telegram, :structured_log`) are validated at policy
   # registration time and raise `BuilderError` on typos.
-  def policy(name : String, &block)
+  def policy(name : String, &)
     builder = CRE::Policy::Builder.new(name)
     with builder yield
     CRE::Policy::REGISTRY << builder.build

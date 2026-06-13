@@ -41,23 +41,16 @@
 //                     FlowControlType
 //   error.rs       - EngineError
 
-use std::collections::{
-    BTreeMap, HashMap, HashSet, VecDeque,
-};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-use iced_x86::{
-    Decoder, DecoderOptions, FlowControl, Formatter,
-    Instruction, IntelFormatter,
-};
+use iced_x86::{Decoder, DecoderOptions, FlowControl, Formatter, Instruction, IntelFormatter};
 use serde::{Deserialize, Serialize};
 
 use crate::context::AnalysisContext;
 use crate::error::EngineError;
 use crate::formats::SectionInfo;
 use crate::pass::{AnalysisPass, Sealed};
-use crate::types::{
-    Architecture, CfgEdgeType, FlowControlType,
-};
+use crate::types::{Architecture, CfgEdgeType, FlowControlType};
 
 const MAX_FUNCTIONS: usize = 1000;
 const MAX_INSTRUCTIONS: usize = 50_000;
@@ -103,9 +96,7 @@ pub struct InstructionInfo {
     pub flow_control: FlowControlType,
 }
 
-#[derive(
-    Debug, Clone, Default, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FunctionCfg {
     pub nodes: Vec<CfgNode>,
     pub edges: Vec<CfgEdge>,
@@ -139,17 +130,14 @@ impl AnalysisPass for DisasmPass {
         &["format"]
     }
 
-    fn run(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> Result<(), EngineError> {
-        let format_result = ctx
-            .format_result
-            .as_ref()
-            .ok_or_else(|| EngineError::MissingDependency {
-                pass: "disasm".into(),
-                dependency: "format".into(),
-            })?;
+    fn run(&self, ctx: &mut AnalysisContext) -> Result<(), EngineError> {
+        let format_result =
+            ctx.format_result
+                .as_ref()
+                .ok_or_else(|| EngineError::MissingDependency {
+                    pass: "disasm".into(),
+                    dependency: "format".into(),
+                })?;
 
         let arch = &format_result.architecture;
         let bits = match arch {
@@ -157,10 +145,7 @@ impl AnalysisPass for DisasmPass {
             Architecture::X86_64 => 64,
             _ => {
                 ctx.disassembly_result =
-                    Some(empty_result(
-                        format_result.bits,
-                        format_result.entry_point,
-                    ));
+                    Some(empty_result(format_result.bits, format_result.entry_point));
                 return Ok(());
             }
         };
@@ -170,26 +155,15 @@ impl AnalysisPass for DisasmPass {
         let entry_point = format_result.entry_point;
 
         let mut seeds = vec![entry_point];
-        seeds.extend_from_slice(
-            &format_result.function_hints,
-        );
+        seeds.extend_from_slice(&format_result.function_hints);
 
-        let result = disassemble(
-            data,
-            sections,
-            bits,
-            entry_point,
-            &seeds,
-        );
+        let result = disassemble(data, sections, bits, entry_point, &seeds);
         ctx.disassembly_result = Some(result);
         Ok(())
     }
 }
 
-fn empty_result(
-    bits: u8,
-    entry_point: u64,
-) -> DisassemblyResult {
+fn empty_result(bits: u8, entry_point: u64) -> DisassemblyResult {
     DisassemblyResult {
         functions: Vec::new(),
         total_instructions: 0,
@@ -214,34 +188,28 @@ fn disassemble(
     let mut functions = Vec::new();
     let mut visited_functions = HashSet::new();
     let mut total_instructions = 0;
-    let mut function_queue: VecDeque<u64> =
-        seeds.iter().copied().collect();
+    let mut function_queue: VecDeque<u64> = seeds.iter().copied().collect();
 
-    while let Some(func_addr) = function_queue.pop_front()
-    {
-        if functions.len() >= MAX_FUNCTIONS
-            || total_instructions >= MAX_INSTRUCTIONS
-        {
+    while let Some(func_addr) = function_queue.pop_front() {
+        if functions.len() >= MAX_FUNCTIONS || total_instructions >= MAX_INSTRUCTIONS {
             break;
         }
         if !visited_functions.insert(func_addr) {
             continue;
         }
-        if vaddr_to_offset(sections, func_addr).is_none()
-        {
+        if vaddr_to_offset(sections, func_addr).is_none() {
             continue;
         }
 
-        let (func_info, discovered_calls) =
-            disassemble_function(
-                data,
-                sections,
-                &exec_sections,
-                bits,
-                func_addr,
-                func_addr == entry_point,
-                MAX_INSTRUCTIONS - total_instructions,
-            );
+        let (func_info, discovered_calls) = disassemble_function(
+            data,
+            sections,
+            &exec_sections,
+            bits,
+            func_addr,
+            func_addr == entry_point,
+            MAX_INSTRUCTIONS - total_instructions,
+        );
 
         total_instructions += func_info.instruction_count;
         functions.push(func_info);
@@ -273,8 +241,7 @@ fn disassemble_function(
     is_entry_point: bool,
     instruction_budget: usize,
 ) -> (FunctionInfo, Vec<u64>) {
-    let mut decoded: BTreeMap<u64, DecodedInstruction> =
-        BTreeMap::new();
+    let mut decoded: BTreeMap<u64, DecodedInstruction> = BTreeMap::new();
     let mut block_leaders: HashSet<u64> = HashSet::new();
     let mut worklist: VecDeque<u64> = VecDeque::new();
     let mut visited: HashSet<u64> = HashSet::new();
@@ -292,10 +259,7 @@ fn disassemble_function(
             break;
         }
 
-        let offset = match vaddr_to_offset(
-            all_sections,
-            addr,
-        ) {
+        let offset = match vaddr_to_offset(all_sections, addr) {
             Some(o) => o as usize,
             None => continue,
         };
@@ -310,17 +274,10 @@ fn disassemble_function(
         }
 
         let slice = &data[offset..];
-        let mut decoder = Decoder::with_ip(
-            bits,
-            slice,
-            addr,
-            DecoderOptions::NONE,
-        );
+        let mut decoder = Decoder::with_ip(bits, slice, addr, DecoderOptions::NONE);
         let mut instr = Instruction::default();
 
-        while decoder.can_decode()
-            && decoded.len() < instruction_budget
-        {
+        while decoder.can_decode() && decoded.len() < instruction_budget {
             decoder.decode_out(&mut instr);
             let ip = instr.ip();
 
@@ -328,30 +285,21 @@ fn disassemble_function(
                 break;
             }
 
-            if ip != addr
-                && block_leaders.contains(&ip)
-            {
+            if ip != addr && block_leaders.contains(&ip) {
                 break;
             }
 
             let fc = instr.flow_control();
-            let mnemonic = format!("{:?}", instr.mnemonic())
-                .to_ascii_lowercase();
+            let mnemonic = format!("{:?}", instr.mnemonic()).to_ascii_lowercase();
 
             let mut operands_str = String::new();
-            formatter
-                .format(&instr, &mut operands_str);
+            formatter.format(&instr, &mut operands_str);
             let operands = operands_str
                 .split_once(' ')
-                .map_or(String::new(), |(_, ops)| {
-                    ops.to_string()
-                });
+                .map_or(String::new(), |(_, ops)| ops.to_string());
 
-            let instr_bytes = &data
-                [offset + (ip - addr) as usize
-                    ..offset
-                        + (ip - addr) as usize
-                        + instr.len()];
+            let instr_bytes =
+                &data[offset + (ip - addr) as usize..offset + (ip - addr) as usize + instr.len()];
 
             let flow_type = map_flow_control(fc);
 
@@ -374,13 +322,10 @@ fn disassemble_function(
 
             match fc {
                 FlowControl::ConditionalBranch => {
-                    let target =
-                        instr.near_branch_target();
+                    let target = instr.near_branch_target();
                     let fall = instr.next_ip();
 
-                    if let Some(di) =
-                        decoded.get_mut(&ip)
-                    {
+                    if let Some(di) = decoded.get_mut(&ip) {
                         di.branch_target = Some(target);
                         di.fallthrough = Some(fall);
                     }
@@ -392,11 +337,8 @@ fn disassemble_function(
                     break;
                 }
                 FlowControl::UnconditionalBranch => {
-                    let target =
-                        instr.near_branch_target();
-                    if let Some(di) =
-                        decoded.get_mut(&ip)
-                    {
+                    let target = instr.near_branch_target();
+                    if let Some(di) = decoded.get_mut(&ip) {
                         di.branch_target = Some(target);
                     }
                     block_leaders.insert(target);
@@ -410,45 +352,32 @@ fn disassemble_function(
                     break;
                 }
                 FlowControl::Call => {
-                    let target =
-                        instr.near_branch_target();
+                    let target = instr.near_branch_target();
                     if target != 0 {
                         discovered_calls.push(target);
                     }
                 }
                 FlowControl::IndirectCall => {}
-                FlowControl::Next
-                | FlowControl::XbeginXabortXend => {}
+                FlowControl::Next | FlowControl::XbeginXabortXend => {}
             }
         }
     }
 
-    let basic_blocks = build_basic_blocks(
-        &decoded,
-        &block_leaders,
-    );
-    let instruction_count: usize = basic_blocks
-        .iter()
-        .map(|bb| bb.instruction_count)
-        .sum();
+    let basic_blocks = build_basic_blocks(&decoded, &block_leaders);
+    let instruction_count: usize = basic_blocks.iter().map(|bb| bb.instruction_count).sum();
 
-    let size = if let (Some(first), Some(last)) = (
-        decoded.keys().next(),
-        decoded.keys().next_back(),
-    ) {
-        if let Some(last_instr) = decoded.get(last) {
-            last_instr.info.address
-                + last_instr.info.size as u64
-                - first
+    let size =
+        if let (Some(first), Some(last)) = (decoded.keys().next(), decoded.keys().next_back()) {
+            if let Some(last_instr) = decoded.get(last) {
+                last_instr.info.address + last_instr.info.size as u64 - first
+            } else {
+                0
+            }
         } else {
             0
-        }
-    } else {
-        0
-    };
+        };
 
-    let cfg = if instruction_count <= CFG_INSTRUCTION_LIMIT
-    {
+    let cfg = if instruction_count <= CFG_INSTRUCTION_LIMIT {
         build_cfg(&basic_blocks)
     } else {
         FunctionCfg::default()
@@ -483,14 +412,11 @@ fn build_basic_blocks(
     }
 
     let mut blocks: Vec<BasicBlockInfo> = Vec::new();
-    let mut current_instrs: Vec<InstructionInfo> =
-        Vec::new();
+    let mut current_instrs: Vec<InstructionInfo> = Vec::new();
     let mut block_start: Option<u64> = None;
 
     for (&addr, di) in decoded {
-        if leaders.contains(&addr)
-            && !current_instrs.is_empty()
-        {
+        if leaders.contains(&addr) && !current_instrs.is_empty() {
             let bb = finalize_block(
                 &current_instrs,
                 block_start.unwrap_or(addr),
@@ -527,35 +453,24 @@ fn build_basic_blocks(
         }
     }
 
-    if !current_instrs.is_empty() {
-        if let Some(start) = block_start {
-            let bb = finalize_block(
-                &current_instrs,
-                start,
-                decoded,
-                leaders,
-            );
-            blocks.push(bb);
-        }
+    if !current_instrs.is_empty()
+        && let Some(start) = block_start
+    {
+        let bb = finalize_block(&current_instrs, start, decoded, leaders);
+        blocks.push(bb);
     }
 
-    let block_starts: HashSet<u64> =
-        blocks.iter().map(|b| b.start_address).collect();
+    let block_starts: HashSet<u64> = blocks.iter().map(|b| b.start_address).collect();
 
     for block in &mut blocks {
-        block
-            .successors
-            .retain(|s| block_starts.contains(s));
+        block.successors.retain(|s| block_starts.contains(s));
     }
 
     let predecessor_map: HashMap<u64, Vec<u64>> = {
-        let mut map: HashMap<u64, Vec<u64>> =
-            HashMap::new();
+        let mut map: HashMap<u64, Vec<u64>> = HashMap::new();
         for block in &blocks {
             for &succ in &block.successors {
-                map.entry(succ)
-                    .or_default()
-                    .push(block.start_address);
+                map.entry(succ).or_default().push(block.start_address);
             }
         }
         map
@@ -578,8 +493,7 @@ fn finalize_block(
     leaders: &HashSet<u64>,
 ) -> BasicBlockInfo {
     let last = instructions.last().unwrap();
-    let end_address =
-        last.address + last.size as u64 - 1;
+    let end_address = last.address + last.size as u64 - 1;
 
     let mut successors = Vec::new();
     let last_addr = last.address;
@@ -591,14 +505,10 @@ fn finalize_block(
             successors.push(fall);
         } else if !matches!(
             di.info.flow_control,
-            FlowControlType::Branch
-                | FlowControlType::Return
-                | FlowControlType::Interrupt
+            FlowControlType::Branch | FlowControlType::Return | FlowControlType::Interrupt
         ) {
             let next = di.next_ip;
-            if leaders.contains(&next)
-                || decoded.contains_key(&next)
-            {
+            if leaders.contains(&next) || decoded.contains_key(&next) {
                 successors.push(next);
             }
         }
@@ -614,9 +524,7 @@ fn finalize_block(
     }
 }
 
-fn build_cfg(
-    blocks: &[BasicBlockInfo],
-) -> FunctionCfg {
+fn build_cfg(blocks: &[BasicBlockInfo]) -> FunctionCfg {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
@@ -635,40 +543,28 @@ fn build_cfg(
 
         nodes.push(CfgNode {
             id: block.start_address,
-            label: format!(
-                "0x{:x}",
-                block.start_address
-            ),
+            label: format!("0x{:x}", block.start_address),
             instruction_count: block.instruction_count,
             instructions_preview: preview,
         });
 
         let last_instr = block.instructions.last();
         for &succ in &block.successors {
-            let edge_type =
-                if let Some(last) = last_instr {
-                    match last.flow_control {
-                        FlowControlType::ConditionalBranch => {
-                            if succ
-                                == block
-                                    .successors
-                                    .first()
-                                    .copied()
-                                    .unwrap_or(0)
-                            {
-                                CfgEdgeType::ConditionalTrue
-                            } else {
-                                CfgEdgeType::ConditionalFalse
-                            }
+            let edge_type = if let Some(last) = last_instr {
+                match last.flow_control {
+                    FlowControlType::ConditionalBranch => {
+                        if succ == block.successors.first().copied().unwrap_or(0) {
+                            CfgEdgeType::ConditionalTrue
+                        } else {
+                            CfgEdgeType::ConditionalFalse
                         }
-                        FlowControlType::Branch => {
-                            CfgEdgeType::Unconditional
-                        }
-                        _ => CfgEdgeType::Fallthrough,
                     }
-                } else {
-                    CfgEdgeType::Fallthrough
-                };
+                    FlowControlType::Branch => CfgEdgeType::Unconditional,
+                    _ => CfgEdgeType::Fallthrough,
+                }
+            } else {
+                CfgEdgeType::Fallthrough
+            };
 
             edges.push(CfgEdge {
                 from: block.start_address,
@@ -681,99 +577,54 @@ fn build_cfg(
     FunctionCfg { nodes, edges }
 }
 
-fn vaddr_to_offset(
-    sections: &[SectionInfo],
-    vaddr: u64,
-) -> Option<u64> {
+fn vaddr_to_offset(sections: &[SectionInfo], vaddr: u64) -> Option<u64> {
     sections.iter().find_map(|s| {
         if s.raw_size > 0
             && vaddr >= s.virtual_address
-            && vaddr
-                < s.virtual_address + s.virtual_size
+            && vaddr < s.virtual_address + s.virtual_size
         {
-            Some(
-                s.raw_offset
-                    + (vaddr - s.virtual_address),
-            )
+            Some(s.raw_offset + (vaddr - s.virtual_address))
         } else {
             None
         }
     })
 }
 
-fn is_in_exec_section(
-    exec_sections: &[&SectionInfo],
-    vaddr: u64,
-) -> bool {
-    exec_sections.iter().any(|s| {
-        vaddr >= s.virtual_address
-            && vaddr
-                < s.virtual_address + s.virtual_size
-    })
+fn is_in_exec_section(exec_sections: &[&SectionInfo], vaddr: u64) -> bool {
+    exec_sections
+        .iter()
+        .any(|s| vaddr >= s.virtual_address && vaddr < s.virtual_address + s.virtual_size)
 }
 
-fn map_flow_control(
-    fc: FlowControl,
-) -> FlowControlType {
+fn map_flow_control(fc: FlowControl) -> FlowControlType {
     match fc {
-        FlowControl::Next
-        | FlowControl::XbeginXabortXend => {
-            FlowControlType::Next
-        }
-        FlowControl::UnconditionalBranch
-        | FlowControl::IndirectBranch => {
-            FlowControlType::Branch
-        }
-        FlowControl::ConditionalBranch => {
-            FlowControlType::ConditionalBranch
-        }
-        FlowControl::Call
-        | FlowControl::IndirectCall => {
-            FlowControlType::Call
-        }
+        FlowControl::Next | FlowControl::XbeginXabortXend => FlowControlType::Next,
+        FlowControl::UnconditionalBranch | FlowControl::IndirectBranch => FlowControlType::Branch,
+        FlowControl::ConditionalBranch => FlowControlType::ConditionalBranch,
+        FlowControl::Call | FlowControl::IndirectCall => FlowControlType::Call,
         FlowControl::Return => FlowControlType::Return,
-        FlowControl::Interrupt
-        | FlowControl::Exception => {
-            FlowControlType::Interrupt
-        }
+        FlowControl::Interrupt | FlowControl::Exception => FlowControlType::Interrupt,
     }
 }
 
-pub fn disassemble_code(
-    code: &[u8],
-    base_addr: u64,
-    bits: u32,
-) -> Vec<InstructionInfo> {
-    let mut decoder = Decoder::with_ip(
-        bits,
-        code,
-        base_addr,
-        DecoderOptions::NONE,
-    );
+pub fn disassemble_code(code: &[u8], base_addr: u64, bits: u32) -> Vec<InstructionInfo> {
+    let mut decoder = Decoder::with_ip(bits, code, base_addr, DecoderOptions::NONE);
     let mut formatter = IntelFormatter::new();
     let mut instr = Instruction::default();
     let mut result = Vec::new();
 
     while decoder.can_decode() {
         decoder.decode_out(&mut instr);
-        let mnemonic = format!(
-            "{:?}",
-            instr.mnemonic()
-        )
-        .to_ascii_lowercase();
+        let mnemonic = format!("{:?}", instr.mnemonic()).to_ascii_lowercase();
 
         let mut full = String::new();
         formatter.format(&instr, &mut full);
         let operands = full
             .split_once(' ')
-            .map_or(String::new(), |(_, ops)| {
-                ops.to_string()
-            });
+            .map_or(String::new(), |(_, ops)| ops.to_string());
 
-        let start =
-            (instr.ip() - base_addr) as usize;
-        let bytes =
-            code[start..start + instr.len()].to_vec();
+        let start = (instr.ip() - base_addr) as usize;
+        let bytes = code[start..start + instr.len()].to_vec();
 
         result.push(InstructionInfo {
             address: instr.ip(),
@@ -781,9 +632,7 @@ pub fn disassemble_code(
             mnemonic,
             operands,
             size: instr.len() as u8,
-            flow_control: map_flow_control(
-                instr.flow_control(),
-            ),
+            flow_control: map_flow_control(instr.flow_control()),
         });
     }
 
@@ -799,13 +648,8 @@ mod tests {
     use crate::types::SectionPermissions;
 
     fn load_fixture(name: &str) -> Vec<u8> {
-        let path = format!(
-            "{}/tests/fixtures/{name}",
-            env!("CARGO_MANIFEST_DIR"),
-        );
-        std::fs::read(&path).unwrap_or_else(|e| {
-            panic!("fixture {path}: {e}")
-        })
+        let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
     }
 
     fn make_ctx(data: Vec<u8>) -> AnalysisContext {
@@ -820,27 +664,17 @@ mod tests {
 
     #[test]
     fn disassemble_simple_function() {
-        let code: &[u8] = &[
-            0x55, 0x48, 0x89, 0xE5, 0x31, 0xC0,
-            0x5D, 0xC3,
-        ];
-        let instrs =
-            disassemble_code(code, 0x1000, 64);
+        let code: &[u8] = &[0x55, 0x48, 0x89, 0xE5, 0x31, 0xC0, 0x5D, 0xC3];
+        let instrs = disassemble_code(code, 0x1000, 64);
         assert_eq!(instrs.len(), 5);
         assert_eq!(instrs[0].mnemonic, "push");
         assert_eq!(instrs[4].mnemonic, "ret");
-        assert_eq!(
-            instrs[4].flow_control,
-            FlowControlType::Return
-        );
+        assert_eq!(instrs[4].flow_control, FlowControlType::Return);
     }
 
     #[test]
     fn basic_block_split_on_branch() {
-        let code: &[u8] = &[
-            0x31, 0xC0, 0x85, 0xC0, 0x74, 0x02,
-            0x31, 0xC9, 0xC3,
-        ];
+        let code: &[u8] = &[0x31, 0xC0, 0x85, 0xC0, 0x74, 0x02, 0x31, 0xC9, 0xC3];
 
         let sections = vec![SectionInfo {
             name: ".text".into(),
@@ -856,13 +690,7 @@ mod tests {
             sha256: String::new(),
         }];
 
-        let result = disassemble(
-            code,
-            &sections,
-            64,
-            0x1000,
-            &[0x1000],
-        );
+        let result = disassemble(code, &sections, 64, 0x1000, &[0x1000]);
         assert!(!result.functions.is_empty());
         let func = &result.functions[0];
         assert!(
@@ -874,10 +702,7 @@ mod tests {
 
     #[test]
     fn cfg_edges_conditional() {
-        let code: &[u8] = &[
-            0x31, 0xC0, 0x85, 0xC0, 0x74, 0x02,
-            0x31, 0xC9, 0xC3,
-        ];
+        let code: &[u8] = &[0x31, 0xC0, 0x85, 0xC0, 0x74, 0x02, 0x31, 0xC9, 0xC3];
 
         let sections = vec![SectionInfo {
             name: ".text".into(),
@@ -893,47 +718,33 @@ mod tests {
             sha256: String::new(),
         }];
 
-        let result = disassemble(
-            code,
-            &sections,
-            64,
-            0x1000,
-            &[0x1000],
-        );
+        let result = disassemble(code, &sections, 64, 0x1000, &[0x1000]);
         let func = &result.functions[0];
-        assert!(
-            !func.cfg.edges.is_empty(),
-            "CFG should have edges"
-        );
-        assert!(
-            !func.cfg.nodes.is_empty(),
-            "CFG should have nodes"
-        );
+        assert!(!func.cfg.edges.is_empty(), "CFG should have edges");
+        assert!(!func.cfg.nodes.is_empty(), "CFG should have nodes");
     }
 
     #[test]
     fn non_x86_returns_empty() {
         let data = vec![0u8; 64];
         let mut ctx = make_ctx(data);
-        ctx.format_result =
-            Some(crate::formats::FormatResult {
-                format: crate::types::BinaryFormat::Elf,
-                architecture: Architecture::Aarch64,
-                bits: 64,
-                endianness:
-                    crate::types::Endianness::Little,
-                entry_point: 0x1000,
-                is_stripped: false,
-                is_pie: false,
-                has_debug_info: false,
-                sections: Vec::new(),
-                segments: Vec::new(),
-                anomalies: Vec::new(),
-                pe_info: None,
-                elf_info: None,
-                macho_info: None,
-                function_hints: Vec::new(),
-            });
+        ctx.format_result = Some(crate::formats::FormatResult {
+            format: crate::types::BinaryFormat::Elf,
+            architecture: Architecture::Aarch64,
+            bits: 64,
+            endianness: crate::types::Endianness::Little,
+            entry_point: 0x1000,
+            is_stripped: false,
+            is_pie: false,
+            has_debug_info: false,
+            sections: Vec::new(),
+            segments: Vec::new(),
+            anomalies: Vec::new(),
+            pe_info: None,
+            elf_info: None,
+            macho_info: None,
+            function_hints: Vec::new(),
+        });
 
         DisasmPass.run(&mut ctx).unwrap();
         let result = ctx.disassembly_result.unwrap();
@@ -946,28 +757,22 @@ mod tests {
         let data = load_fixture("hello_elf");
         let mut ctx = make_ctx(data);
 
-        crate::passes::format::FormatPass
-            .run(&mut ctx)
-            .unwrap();
+        crate::passes::format::FormatPass.run(&mut ctx).unwrap();
         DisasmPass.run(&mut ctx).unwrap();
 
-        let result =
-            ctx.disassembly_result.as_ref().unwrap();
+        let result = ctx.disassembly_result.as_ref().unwrap();
         assert!(
             result.total_functions > 0,
             "should find at least one function"
         );
         assert!(result.total_instructions > 0);
 
-        let entry_func = result.functions.iter().find(
-            |f| {
-                f.address
-                    == result.entry_function_address
-            },
-        );
+        let entry_func = result
+            .functions
+            .iter()
+            .find(|f| f.address == result.entry_function_address);
         assert!(
-            entry_func.is_some()
-                || !result.functions.is_empty(),
+            entry_func.is_some() || !result.functions.is_empty(),
             "should have disassembled functions"
         );
     }
@@ -977,9 +782,7 @@ mod tests {
         let data = load_fixture("hello_elf");
         let mut ctx = make_ctx(data);
 
-        crate::passes::format::FormatPass
-            .run(&mut ctx)
-            .unwrap();
+        crate::passes::format::FormatPass.run(&mut ctx).unwrap();
         assert!(ctx.disassembly_result.is_none());
 
         DisasmPass.run(&mut ctx).unwrap();

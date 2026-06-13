@@ -43,15 +43,15 @@ struct SharedState {
 };
 
 class ThreadPool {
-public:
-    using WorkFn = std::function<void(unsigned thread_id, unsigned total, SharedState&)>;
+  public:
+    using WorkFn = std::function<void(unsigned thread_id, unsigned total, SharedState &)>;
 
     explicit ThreadPool(unsigned thread_count);
 
     void run(WorkFn work);
-    SharedState& state();
+    SharedState &state();
 
-private:
+  private:
     unsigned thread_count_;
     SharedState state_;
 };

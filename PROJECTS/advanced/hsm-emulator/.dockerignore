@@ -1,0 +1,7 @@
+# ©AngelaMos | 2026
+# .dockerignore
+.zig-cache
+zig-out
+docs
+.git
+*.tmp

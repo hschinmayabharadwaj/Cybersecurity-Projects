@@ -34,10 +34,7 @@ export function AttackersPage() {
             {attackers?.map((a) => (
               <tr key={a.id}>
                 <td>
-                  <Link
-                    to={`/attackers/${a.id}`}
-                    className={styles.link}
-                  >
+                  <Link to={`/attackers/${a.id}`} className={styles.link}>
                     {a.ip}
                   </Link>
                 </td>

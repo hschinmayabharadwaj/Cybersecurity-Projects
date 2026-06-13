@@ -48,11 +48,11 @@ module CRE::Persistence::Sqlite
       @audit ||= AuditRepo.new(@db)
     end
 
-    def transaction(&block : ->) : Nil
+    def transaction(& : ->) : Nil
       @db.transaction { yield }
     end
 
-    def with_advisory_lock(key : Int64, &block : ->) : Nil
+    def with_advisory_lock(key : Int64, & : ->) : Nil
       _ = key # SQLite is single-process; the mutex is sufficient
       @mutex.synchronize { yield }
     end

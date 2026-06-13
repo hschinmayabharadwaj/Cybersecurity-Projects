@@ -22,33 +22,23 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::models::{
-    AnalysisRow, NewAnalysis, NewPassResult,
-    PassResultRow,
-};
+use super::models::{AnalysisRow, NewAnalysis, NewPassResult, PassResultRow};
 
 pub async fn find_slug_by_sha256(
     pool: &PgPool,
     sha256: &str,
 ) -> Result<Option<String>, sqlx::Error> {
-    sqlx::query_scalar(
-        "SELECT slug FROM analyses WHERE sha256 = $1",
-    )
-    .bind(sha256)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_scalar("SELECT slug FROM analyses WHERE sha256 = $1")
+        .bind(sha256)
+        .fetch_optional(pool)
+        .await
 }
 
-pub async fn find_by_slug(
-    pool: &PgPool,
-    slug: &str,
-) -> Result<Option<AnalysisRow>, sqlx::Error> {
-    sqlx::query_as::<_, AnalysisRow>(
-        "SELECT * FROM analyses WHERE slug = $1",
-    )
-    .bind(slug)
-    .fetch_optional(pool)
-    .await
+pub async fn find_by_slug(pool: &PgPool, slug: &str) -> Result<Option<AnalysisRow>, sqlx::Error> {
+    sqlx::query_as::<_, AnalysisRow>("SELECT * FROM analyses WHERE slug = $1")
+        .bind(slug)
+        .fetch_optional(pool)
+        .await
 }
 
 pub async fn find_pass_results(

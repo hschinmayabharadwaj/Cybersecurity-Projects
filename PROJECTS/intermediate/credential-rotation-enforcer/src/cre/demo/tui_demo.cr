@@ -19,7 +19,7 @@ module CRE::Demo
       bus.run
       tui.start
 
-      script_fiber = spawn do
+      spawn do
         run_script(bus, seconds)
       end
 

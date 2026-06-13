@@ -13,8 +13,8 @@ Connects to:
   core/Concepts.hpp     - CrackError enum for error assertions
 */
 
-#include <gtest/gtest.h>
 #include "src/hash/HashDetector.hpp"
+#include <gtest/gtest.h>
 
 TEST(HashDetectorTest, DetectsMD5) {
     auto result = HashDetector::detect("d41d8cd98f00b204e9800998ecf8427e");
@@ -29,8 +29,8 @@ TEST(HashDetectorTest, DetectsSHA1) {
 }
 
 TEST(HashDetectorTest, DetectsSHA256) {
-    auto result = HashDetector::detect(
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    auto result =
+        HashDetector::detect("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, HashType::SHA256);
 }

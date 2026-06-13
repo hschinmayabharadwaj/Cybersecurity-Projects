@@ -52,9 +52,7 @@ export function Shell() {
 
         <div className={styles.status}>
           <span className={styles.statusLabel}>LINK</span>
-          <span
-            className={connected ? styles.statusOn : styles.statusOff}
-          >
+          <span className={connected ? styles.statusOn : styles.statusOff}>
             {connected ? 'ACTIVE' : 'DOWN'}
           </span>
         </div>

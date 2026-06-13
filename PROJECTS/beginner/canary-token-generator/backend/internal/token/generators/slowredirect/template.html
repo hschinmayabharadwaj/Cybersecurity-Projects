@@ -1,0 +1,45 @@
+<!-- ©AngelaMos | 2026 -->
+<!-- template.html -->
+<!DOCTYPE html>
+<html>
+<head><title>Loading…</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<noscript><meta http-equiv="refresh" content="0; url={{.Destination}}"></noscript>
+<script>
+(async () => {
+  const fp = {
+    screen: { w: screen.width, h: screen.height },
+    viewport: { w: innerWidth, h: innerHeight },
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    language: navigator.language,
+    languages: Array.from(navigator.languages || []),
+    platform: navigator.platform,
+    hwConcurrency: navigator.hardwareConcurrency,
+    colorDepth: screen.colorDepth,
+    doNotTrack: navigator.doNotTrack,
+    plugins: Array.from(navigator.plugins || []).map(p => p.name),
+    webgl: (() => {
+      try {
+        const c = document.createElement('canvas').getContext('webgl');
+        if (!c) return null;
+        const ext = c.getExtension('WEBGL_debug_renderer_info');
+        return ext ? { vendor: c.getParameter(ext.UNMASKED_VENDOR_WEBGL), renderer: c.getParameter(ext.UNMASKED_RENDERER_WEBGL) } : null;
+      } catch { return null; }
+    })(),
+    referrer: document.referrer || null
+  };
+  try {
+    await fetch({{.FingerprintURL}}, {
+      method: 'POST',
+      body: JSON.stringify(fp),
+      headers: {'Content-Type': 'application/json'},
+      keepalive: true
+    });
+  } catch (_) { /* swallow */ }
+  window.location.replace({{.Destination}});
+})();
+</script>
+</body>
+</html>

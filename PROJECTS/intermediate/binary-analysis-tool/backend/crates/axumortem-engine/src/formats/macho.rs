@@ -26,21 +26,16 @@
 //   types.rs       - Architecture, BinaryFormat, Endianness,
 //                     SectionPermissions
 
-use goblin::mach::cputype::{
-    CPU_TYPE_ARM, CPU_TYPE_ARM64, CPU_TYPE_X86,
-    CPU_TYPE_X86_64,
-};
+use goblin::mach::cputype::{CPU_TYPE_ARM, CPU_TYPE_ARM64, CPU_TYPE_X86, CPU_TYPE_X86_64};
 use goblin::mach::load_command::CommandVariant;
 use goblin::mach::{Mach, MachO};
 
 use super::{
-    compute_section_hash, detect_common_anomalies,
-    FormatResult, MachOInfo, SectionInfo, SegmentInfo,
+    FormatResult, MachOInfo, SectionInfo, SegmentInfo, compute_section_hash,
+    detect_common_anomalies,
 };
 use crate::error::EngineError;
-use crate::types::{
-    Architecture, BinaryFormat, Endianness, SectionPermissions,
-};
+use crate::types::{Architecture, BinaryFormat, Endianness, SectionPermissions};
 
 const MH_OBJECT: u32 = 1;
 const MH_EXECUTE: u32 = 2;
@@ -53,34 +48,23 @@ const VM_PROT_READ: u32 = 0x01;
 const VM_PROT_WRITE: u32 = 0x02;
 const VM_PROT_EXECUTE: u32 = 0x04;
 
-pub fn parse_macho(
-    mach: &Mach,
-    data: &[u8],
-) -> Result<FormatResult, EngineError> {
+pub fn parse_macho(mach: &Mach, data: &[u8]) -> Result<FormatResult, EngineError> {
     match mach {
-        Mach::Binary(macho) => {
-            parse_single_macho(macho, data, false)
-        }
+        Mach::Binary(macho) => parse_single_macho(macho, data, false),
         Mach::Fat(fat) => {
             for arch in fat.iter_arches() {
-                let arch = arch.map_err(|e| {
-                    EngineError::InvalidBinary {
-                        reason: e.to_string(),
-                    }
+                let arch = arch.map_err(|e| EngineError::InvalidBinary {
+                    reason: e.to_string(),
                 })?;
                 let offset = arch.offset as usize;
                 let size = arch.size as usize;
                 let end = offset.saturating_add(size);
                 if end <= data.len() {
-                    let macho = MachO::parse(data, offset)
-                        .map_err(|e| {
-                        EngineError::InvalidBinary {
+                    let macho =
+                        MachO::parse(data, offset).map_err(|e| EngineError::InvalidBinary {
                             reason: e.to_string(),
-                        }
-                    })?;
-                    return parse_single_macho(
-                        &macho, data, true,
-                    );
+                        })?;
+                    return parse_single_macho(&macho, data, true);
                 }
             }
             Err(EngineError::InvalidBinary {
@@ -97,8 +81,7 @@ fn parse_single_macho(
     data: &[u8],
     is_universal: bool,
 ) -> Result<FormatResult, EngineError> {
-    let architecture =
-        map_architecture(macho.header.cputype);
+    let architecture = map_architecture(macho.header.cputype);
     let bits = if macho.is_64 { 64 } else { 32 };
     let endianness = if macho.little_endian {
         Endianness::Little
@@ -107,25 +90,20 @@ fn parse_single_macho(
     };
     let entry_point = macho.entry;
 
-    let symbols: Vec<_> =
-        macho.symbols().flatten().collect();
+    let symbols: Vec<_> = macho.symbols().flatten().collect();
     let is_stripped = symbols.is_empty();
 
-    let has_debug_info = macho.segments.iter().any(|seg| {
-        seg.name().is_ok_and(|n| n == "__DWARF")
-    });
+    let has_debug_info = macho
+        .segments
+        .iter()
+        .any(|seg| seg.name().is_ok_and(|n| n == "__DWARF"));
 
     let is_pie = macho.header.flags & 0x0020_0000 != 0;
 
     let sections = build_sections(macho, data);
     let segments = build_segments(macho);
-    let anomalies = detect_common_anomalies(
-        &sections,
-        entry_point,
-        is_stripped,
-    );
-    let macho_info =
-        build_macho_info(macho, is_universal);
+    let anomalies = detect_common_anomalies(&sections, entry_point, is_stripped);
+    let macho_info = build_macho_info(macho, is_universal);
 
     let function_hints: Vec<u64> = macho
         .symbols()
@@ -164,11 +142,7 @@ fn map_architecture(cputype: u32) -> Architecture {
         CPU_TYPE_X86_64 => Architecture::X86_64,
         CPU_TYPE_ARM => Architecture::Arm,
         CPU_TYPE_ARM64 => Architecture::Aarch64,
-        other => {
-            Architecture::Other(format!(
-                "mach-cpu-{other:#x}"
-            ))
-        }
+        other => Architecture::Other(format!("mach-cpu-{other:#x}")),
     }
 }
 
@@ -184,24 +158,19 @@ fn file_type_name(filetype: u32) -> String {
     }
 }
 
-fn cpu_subtype_name(
-    cputype: u32,
-    cpusubtype: u32,
-) -> String {
+fn cpu_subtype_name(cputype: u32, cpusubtype: u32) -> String {
     let subtype = cpusubtype & 0x00FF_FFFF;
     match cputype {
-        CPU_TYPE_X86 | CPU_TYPE_X86_64 => {
-            match subtype {
-                3 => "ALL".into(),
-                4 => "486".into(),
-                8 => "PENTIUM_3".into(),
-                9 => "PENTIUM_M".into(),
-                10 => "PENTIUM_4".into(),
-                11 => "ITANIUM".into(),
-                12 => "XEON".into(),
-                _ => format!("{subtype}"),
-            }
-        }
+        CPU_TYPE_X86 | CPU_TYPE_X86_64 => match subtype {
+            3 => "ALL".into(),
+            4 => "486".into(),
+            8 => "PENTIUM_3".into(),
+            9 => "PENTIUM_M".into(),
+            10 => "PENTIUM_4".into(),
+            11 => "ITANIUM".into(),
+            12 => "XEON".into(),
+            _ => format!("{subtype}"),
+        },
         CPU_TYPE_ARM => match subtype {
             6 => "v6".into(),
             9 => "v7".into(),
@@ -220,34 +189,23 @@ fn cpu_subtype_name(
     }
 }
 
-fn build_sections(
-    macho: &MachO,
-    data: &[u8],
-) -> Vec<SectionInfo> {
+fn build_sections(macho: &MachO, data: &[u8]) -> Vec<SectionInfo> {
     let mut sections = Vec::new();
     for segment in macho.segments.iter() {
         let initprot = segment.initprot;
         let seg_permissions = SectionPermissions {
             read: (initprot & VM_PROT_READ) != 0,
             write: (initprot & VM_PROT_WRITE) != 0,
-            execute: (initprot & VM_PROT_EXECUTE)
-                != 0,
+            execute: (initprot & VM_PROT_EXECUTE) != 0,
         };
         for section_result in segment.into_iter() {
-            let Ok((section, _section_data)) =
-                section_result
-            else {
+            let Ok((section, _section_data)) = section_result else {
                 continue;
             };
-            let name = section
-                .name()
-                .unwrap_or("???")
-                .to_string();
+            let name = section.name().unwrap_or("???").to_string();
             let raw_offset = section.offset as u64;
             let raw_size = section.size;
-            let sha256 = compute_section_hash(
-                data, raw_offset, raw_size,
-            );
+            let sha256 = compute_section_hash(data, raw_offset, raw_size);
 
             sections.push(SectionInfo {
                 name,
@@ -268,16 +226,12 @@ fn build_segments(macho: &MachO) -> Vec<SegmentInfo> {
         .segments
         .iter()
         .map(|seg| {
-            let name = seg
-                .name()
-                .ok()
-                .map(|n| n.to_string());
+            let name = seg.name().ok().map(|n| n.to_string());
             let initprot = seg.initprot;
             let permissions = SectionPermissions {
                 read: (initprot & VM_PROT_READ) != 0,
                 write: (initprot & VM_PROT_WRITE) != 0,
-                execute: (initprot & VM_PROT_EXECUTE)
-                    != 0,
+                execute: (initprot & VM_PROT_EXECUTE) != 0,
             };
 
             SegmentInfo {
@@ -292,16 +246,9 @@ fn build_segments(macho: &MachO) -> Vec<SegmentInfo> {
         .collect()
 }
 
-fn build_macho_info(
-    macho: &MachO,
-    is_universal: bool,
-) -> MachOInfo {
-    let file_type =
-        file_type_name(macho.header.filetype);
-    let cpu_subtype = cpu_subtype_name(
-        macho.header.cputype,
-        macho.header.cpusubtype,
-    );
+fn build_macho_info(macho: &MachO, is_universal: bool) -> MachOInfo {
+    let file_type = file_type_name(macho.header.filetype);
+    let cpu_subtype = cpu_subtype_name(macho.header.cputype, macho.header.cpusubtype);
 
     let mut has_code_signature = false;
     let mut has_function_starts = false;

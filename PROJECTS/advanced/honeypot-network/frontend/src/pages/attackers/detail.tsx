@@ -57,9 +57,7 @@ export function AttackerDetailPage() {
 
         <div className={styles.dossierRow}>
           <span className={styles.dossierLabel}>THREAT SCORE</span>
-          <span
-            className={`${styles.dossierValue} ${styles.threatValue}`}
-          >
+          <span className={`${styles.dossierValue} ${styles.threatValue}`}>
             {attacker.threat_score}
           </span>
         </div>

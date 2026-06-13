@@ -11,13 +11,12 @@
 uint16_t IP_class::get_payload_len() const { return payload_len; }
 
 TransportProtocol IP_class::get_protocol() const { return protocol; }
-std::string IP_class::get_source() { return src; }
-std::string IP_class::get_dest() { return dst; }
+const std::string &IP_class::get_source() const { return src; }
+const std::string &IP_class::get_dest() const { return dst; }
 
 /*** Ipv4 ***/
 IPv4::IPv4(const u_char *data)
-    : ip_hdr(reinterpret_cast<const ip *>(data)),
-      ip_hdr_len(static_cast<int>(ip_hdr->ip_hl) * 4) {
+	: ip_hdr(reinterpret_cast<const ip *>(data)), ip_hdr_len(static_cast<int>(ip_hdr->ip_hl) * 4) {
 	std::array<char, INET_ADDRSTRLEN> src_buf{};
 	inet_ntop(AF_INET, &ip_hdr->ip_src, src_buf.data(), sizeof(src_buf));
 	src = src_buf.data();
@@ -84,8 +83,7 @@ uint16_t IPv4::get_dest_port() { return dest_port; }
 /*** Ipv6 ***/
 
 IPv6::IPv6(const u_char *data)
-    : ip_hdr(reinterpret_cast<const ip6_hdr *>(data)),
-      ptr(reinterpret_cast<const uint8_t *>(ip_hdr + 1)) {
+	: ip_hdr(reinterpret_cast<const ip6_hdr *>(data)), ptr(reinterpret_cast<const uint8_t *>(ip_hdr + 1)) {
 	uint8_t hdr = ip_hdr->ip6_nxt;
 	std::array<char, INET6_ADDRSTRLEN> src{};
 	inet_ntop(AF_INET6, &ip_hdr->ip6_src, src.data(), sizeof(src));

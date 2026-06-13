@@ -68,6 +68,16 @@ jobs:
           - name: dlp-scanner
             type: ruff
             path: PROJECTS/intermediate/dlp-scanner
+          # Python (ruff) - Foundations
+          - name: hash-identifier
+            type: ruff
+            path: PROJECTS/foundations/hash-identifier
+          - name: http-headers-scanner
+            type: ruff
+            path: PROJECTS/foundations/http-headers-scanner
+          - name: password-manager
+            type: ruff
+            path: PROJECTS/foundations/password-manager
           # Biome (frontend)
           - name: bug-bounty-platform-frontend
             type: biome
@@ -84,6 +94,21 @@ jobs:
           - name: encrypted-p2p-chat-frontend
             type: biome
             path: PROJECTS/advanced/encrypted-p2p-chat/frontend
+          - name: canary-token-generator-frontend
+            type: biome
+            path: PROJECTS/beginner/canary-token-generator/frontend
+          - name: ai-threat-detection-frontend
+            type: biome
+            path: PROJECTS/advanced/ai-threat-detection/frontend
+          - name: binary-analysis-tool-frontend
+            type: biome
+            path: PROJECTS/intermediate/binary-analysis-tool/frontend
+          - name: honeypot-network-frontend
+            type: biome
+            path: PROJECTS/advanced/honeypot-network/frontend
+          - name: monitor-the-situation-dashboard-frontend
+            type: biome
+            path: PROJECTS/advanced/monitor-the-situation-dashboard/frontend
           # Go
           - name: simple-vulnerability-scanner
             type: go
@@ -94,10 +119,51 @@ jobs:
           - name: secrets-scanner
             type: go
             path: PROJECTS/intermediate/secrets-scanner
+          - name: canary-token-generator-backend
+            type: go
+            path: PROJECTS/beginner/canary-token-generator/backend
+          - name: systemd-persistence-scanner
+            type: go
+            path: PROJECTS/beginner/systemd-persistence-scanner
+          - name: sbom-generator-vulnerability-matcher
+            type: go
+            path: PROJECTS/intermediate/sbom-generator-vulnerability-matcher
+          - name: honeypot-network
+            type: go
+            path: PROJECTS/advanced/honeypot-network
+          - name: monitor-the-situation-dashboard-backend
+            type: go
+            path: PROJECTS/advanced/monitor-the-situation-dashboard/backend
           # Nim
           - name: credential-enumeration
             type: nim
             path: PROJECTS/intermediate/credential-enumeration
+          # Rust
+          - name: binary-analysis-tool-backend
+            type: rust
+            path: PROJECTS/intermediate/binary-analysis-tool/backend
+          # Crystal
+          - name: credential-rotation-enforcer
+            type: crystal
+            path: PROJECTS/intermediate/credential-rotation-enforcer
+          # V (Vlang)
+          - name: firewall-rule-engine
+            type: v
+            path: PROJECTS/beginner/firewall-rule-engine
+          # C++
+          - name: hash-cracker
+            type: cpp
+            path: PROJECTS/beginner/hash-cracker
+          - name: simple-port-scanner
+            type: cpp
+            path: PROJECTS/beginner/simple-port-scanner
+          - name: network-traffic-analyzer-cpp
+            type: cpp
+            path: PROJECTS/beginner/network-traffic-analyzer/cpp
+          # Bash (shellcheck)
+          - name: linux-cis-hardening-auditor
+            type: bash
+            path: PROJECTS/beginner/linux-cis-hardening-auditor
 
     defaults:
       run:
@@ -155,7 +221,7 @@ jobs:
 
     - name: Install golangci-lint
       if: matrix.type == 'go'
-      run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.1
 
     # Nim Setup
     - name: Setup Nim
@@ -167,6 +233,73 @@ jobs:
     - name: Install nph
       if: matrix.type == 'nim'
       run: nimble install -y nph
+
+    # Rust Setup (pinned to match locally-verified clippy version)
+    - name: Install Rust 1.92.0
+      if: matrix.type == 'rust'
+      uses: dtolnay/rust-toolchain@1.92.0
+      with:
+        components: rustfmt, clippy
+
+    - name: Cache Cargo registry and target
+      if: matrix.type == 'rust'
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "${{ matrix.path }} -> target"
+
+    # Crystal Setup
+    - name: Install libyaml-dev (ameba dep)
+      if: matrix.type == 'crystal'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y libyaml-dev
+
+    - name: Install Crystal
+      if: matrix.type == 'crystal'
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: 1.20.0
+
+    - name: Cache shards
+      if: matrix.type == 'crystal'
+      uses: actions/cache@v4
+      with:
+        path: ${{ matrix.path }}/lib
+        key: ${{ runner.os }}-shards-${{ matrix.name }}-${{ hashFiles(format('{0}/shard.lock', matrix.path)) }}
+        restore-keys: |
+          ${{ runner.os }}-shards-${{ matrix.name }}-
+          ${{ runner.os }}-shards-
+
+    - name: Install shards
+      if: matrix.type == 'crystal'
+      run: shards install
+
+    - name: Build ameba binary
+      if: matrix.type == 'crystal'
+      run: |
+        mkdir -p bin
+        crystal build lib/ameba/bin/ameba.cr -o bin/ameba
+
+    # V (Vlang) Setup (no check-latest — master drift breaks fmt parity)
+    - name: Install V
+      if: matrix.type == 'v'
+      uses: vlang/setup-v@v1.4
+
+    # C++ Setup (pinned clang-format via PyPI wheel — apt patch versions drift)
+    - name: Install clang-format and cppcheck
+      if: matrix.type == 'cpp'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y cppcheck python3-pip
+        pip install --user --break-system-packages clang-format==19.1.7
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    # Bash Setup (shellcheck pre-installed on ubuntu-latest, but ensure latest)
+    - name: Install shellcheck
+      if: matrix.type == 'bash'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y shellcheck
 
     # Ruff Linting
     - name: Run ruff
@@ -245,6 +378,153 @@ jobs:
           echo "Nim checks found issues"
         fi
         cat nim-output.txt
+      continue-on-error: true
+
+    # Rust Linting
+    - name: Run cargo fmt and clippy
+      if: matrix.type == 'rust'
+      id: rust
+      run: |
+        RUST_OK=true
+        echo "Running cargo fmt --check..."
+        if cargo fmt -- --check > rust-output.txt 2>&1; then
+          echo "cargo fmt: no issues"
+        else
+          RUST_OK=false
+          echo "cargo fmt: formatting issues found"
+        fi
+        echo "Running cargo clippy..."
+        if cargo clippy --all-targets --all-features -- -D warnings >> rust-output.txt 2>&1; then
+          echo "cargo clippy: no issues"
+        else
+          RUST_OK=false
+          echo "cargo clippy: issues found"
+        fi
+        if [[ "$RUST_OK" == "true" ]]; then
+          echo "RUST_PASSED=true" >> $GITHUB_ENV
+        else
+          echo "RUST_PASSED=false" >> $GITHUB_ENV
+        fi
+        cat rust-output.txt
+      continue-on-error: true
+
+    # Crystal Linting
+    - name: Run crystal format + ameba + compile check
+      if: matrix.type == 'crystal'
+      id: crystal
+      run: |
+        CRYSTAL_OK=true
+        echo "Running crystal tool format --check..."
+        if crystal tool format --check src/ spec/ > crystal-output.txt 2>&1; then
+          echo "crystal format: no issues"
+        else
+          CRYSTAL_OK=false
+          echo "crystal format: formatting issues found"
+        fi
+        echo "Running ameba..."
+        if bin/ameba src/ >> crystal-output.txt 2>&1; then
+          echo "ameba: no issues"
+        else
+          CRYSTAL_OK=false
+          echo "ameba: issues found"
+        fi
+        echo "Running crystal build --no-codegen..."
+        if crystal build --no-codegen src/cre.cr >> crystal-output.txt 2>&1; then
+          echo "crystal build: passed"
+        else
+          CRYSTAL_OK=false
+          echo "crystal build: failed"
+        fi
+        if [[ "$CRYSTAL_OK" == "true" ]]; then
+          echo "CRYSTAL_PASSED=true" >> $GITHUB_ENV
+        else
+          echo "CRYSTAL_PASSED=false" >> $GITHUB_ENV
+        fi
+        cat crystal-output.txt
+      continue-on-error: true
+
+    # V Linting (v fmt is advisory — formatter rules drift between V builds even
+    # within the same version string, making strict fmt parity impractical. v vet
+    # is stable across builds and remains the pass/fail gate.)
+    - name: Run v fmt (advisory) and v vet
+      if: matrix.type == 'v'
+      id: v
+      run: |
+        V_OK=true
+        echo "Running v fmt -diff src/ (advisory)..."
+        v fmt -diff src/ > v-output.txt 2>&1 || true
+        echo "Running v fmt -verify src/ (advisory)..."
+        if v fmt -verify src/ >> v-output.txt 2>&1; then
+          echo "v fmt: no issues"
+        else
+          echo "v fmt: formatting suggestions found (advisory — not failing the job)"
+        fi
+        echo "Running v vet src/..."
+        if v vet src/ >> v-output.txt 2>&1; then
+          echo "v vet: no issues"
+        else
+          V_OK=false
+          echo "v vet: issues found"
+        fi
+        if [[ "$V_OK" == "true" ]]; then
+          echo "V_PASSED=true" >> $GITHUB_ENV
+        else
+          echo "V_PASSED=false" >> $GITHUB_ENV
+        fi
+        cat v-output.txt
+      continue-on-error: true
+
+    # C++ Linting
+    - name: Run clang-format and cppcheck
+      if: matrix.type == 'cpp'
+      id: cpp
+      run: |
+        CPP_OK=true
+        echo "Running clang-format check..."
+        FILES=$(find . \( -path ./build -o -path ./cmake-build -o -path ./node_modules -o -path ./.git \) -prune -o \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) -print 2>/dev/null)
+        if [ -n "$FILES" ]; then
+          if echo "$FILES" | xargs clang-format --dry-run --Werror > cpp-output.txt 2>&1; then
+            echo "clang-format: no issues"
+          else
+            CPP_OK=false
+            echo "clang-format: formatting issues found"
+          fi
+        else
+          echo "clang-format: no C++ files found" > cpp-output.txt
+        fi
+        echo "Running cppcheck..."
+        if cppcheck --enable=warning,style,performance,portability --error-exitcode=1 --suppress=missingIncludeSystem --suppress=normalCheckLevelMaxBranches -i build -i cmake-build -q . >> cpp-output.txt 2>&1; then
+          echo "cppcheck: no issues"
+        else
+          CPP_OK=false
+          echo "cppcheck: issues found"
+        fi
+        if [[ "$CPP_OK" == "true" ]]; then
+          echo "CPP_PASSED=true" >> $GITHUB_ENV
+        else
+          echo "CPP_PASSED=false" >> $GITHUB_ENV
+        fi
+        cat cpp-output.txt
+      continue-on-error: true
+
+    # Bash Linting
+    - name: Run shellcheck
+      if: matrix.type == 'bash'
+      id: bash
+      run: |
+        echo "Running shellcheck..."
+        FILES=$(find . -name '*.sh' -not -path '*/.venv/*' -not -path '*/node_modules/*' 2>/dev/null || true)
+        if [ -z "$FILES" ]; then
+          echo "shellcheck: no .sh files found" > bash-output.txt
+          echo "BASH_PASSED=true" >> $GITHUB_ENV
+        elif echo "$FILES" | xargs shellcheck > bash-output.txt 2>&1; then
+          echo "BASH_PASSED=true" >> $GITHUB_ENV
+          echo "shellcheck: no issues"
+        else
+          echo "BASH_PASSED=false" >> $GITHUB_ENV
+          echo "shellcheck: issues found"
+        fi
+        cat bash-output.txt
       continue-on-error: true
 
     # Create Summary for Ruff
@@ -371,6 +651,151 @@ jobs:
           fi
         } >> $GITHUB_STEP_SUMMARY
 
+    # Create Summary for Rust
+    - name: Create Rust Lint Summary
+      if: matrix.type == 'rust'
+      run: |
+        {
+          echo "## Lint Results: ${{ matrix.name }}"
+          echo ''
+          if [[ "${{ env.RUST_PASSED }}" == "true" ]]; then
+            echo '### cargo fmt + clippy: **Passed**'
+            echo 'No Rust issues found.'
+          else
+            echo '### cargo fmt + clippy: **Issues Found**'
+            echo '<details><summary>View output</summary>'
+            echo ''
+            echo '```'
+            head -100 rust-output.txt
+            echo '```'
+            echo '</details>'
+          fi
+          echo ''
+          if [[ "${{ env.RUST_PASSED }}" == "true" ]]; then
+            echo '---'
+            echo '### All checks passed!'
+          else
+            echo '---'
+            echo '### Review the issues above'
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
+    # Create Summary for Crystal
+    - name: Create Crystal Lint Summary
+      if: matrix.type == 'crystal'
+      run: |
+        {
+          echo "## Lint Results: ${{ matrix.name }}"
+          echo ''
+          if [[ "${{ env.CRYSTAL_PASSED }}" == "true" ]]; then
+            echo '### crystal format + ameba + build: **Passed**'
+            echo 'No Crystal issues found.'
+          else
+            echo '### crystal format + ameba + build: **Issues Found**'
+            echo '<details><summary>View output</summary>'
+            echo ''
+            echo '```'
+            head -100 crystal-output.txt
+            echo '```'
+            echo '</details>'
+          fi
+          echo ''
+          if [[ "${{ env.CRYSTAL_PASSED }}" == "true" ]]; then
+            echo '---'
+            echo '### All checks passed!'
+          else
+            echo '---'
+            echo '### Review the issues above'
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
+    # Create Summary for V
+    - name: Create V Lint Summary
+      if: matrix.type == 'v'
+      run: |
+        {
+          echo "## Lint Results: ${{ matrix.name }}"
+          echo ''
+          if [[ "${{ env.V_PASSED }}" == "true" ]]; then
+            echo '### v vet: **Passed** (v fmt advisory)'
+            echo 'No V vet issues found. See output for v fmt suggestions.'
+          else
+            echo '### v vet: **Issues Found**'
+            echo '<details><summary>View output</summary>'
+            echo ''
+            echo '```'
+            head -100 v-output.txt
+            echo '```'
+            echo '</details>'
+          fi
+          echo ''
+          if [[ "${{ env.V_PASSED }}" == "true" ]]; then
+            echo '---'
+            echo '### All checks passed!'
+          else
+            echo '---'
+            echo '### Review the issues above'
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
+    # Create Summary for C++
+    - name: Create C++ Lint Summary
+      if: matrix.type == 'cpp'
+      run: |
+        {
+          echo "## Lint Results: ${{ matrix.name }}"
+          echo ''
+          if [[ "${{ env.CPP_PASSED }}" == "true" ]]; then
+            echo '### clang-format + cppcheck: **Passed**'
+            echo 'No C++ issues found.'
+          else
+            echo '### clang-format + cppcheck: **Issues Found**'
+            echo '<details><summary>View output</summary>'
+            echo ''
+            echo '```'
+            head -100 cpp-output.txt
+            echo '```'
+            echo '</details>'
+          fi
+          echo ''
+          if [[ "${{ env.CPP_PASSED }}" == "true" ]]; then
+            echo '---'
+            echo '### All checks passed!'
+          else
+            echo '---'
+            echo '### Review the issues above'
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
+    # Create Summary for Bash
+    - name: Create Bash Lint Summary
+      if: matrix.type == 'bash'
+      run: |
+        {
+          echo "## Lint Results: ${{ matrix.name }}"
+          echo ''
+          if [[ "${{ env.BASH_PASSED }}" == "true" ]]; then
+            echo '### shellcheck: **Passed**'
+            echo 'No shell issues found.'
+          else
+            echo '### shellcheck: **Issues Found**'
+            echo '<details><summary>View output</summary>'
+            echo ''
+            echo '```'
+            head -100 bash-output.txt
+            echo '```'
+            echo '</details>'
+          fi
+          echo ''
+          if [[ "${{ env.BASH_PASSED }}" == "true" ]]; then
+            echo '---'
+            echo '### All checks passed!'
+          else
+            echo '---'
+            echo '### Review the issues above'
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
     # Exit with proper status
     - name: Check lint status
       run: |
@@ -392,6 +817,31 @@ jobs:
         elif [[ "${{ matrix.type }}" == "nim" ]]; then
           if [[ "${{ env.NIM_PASSED }}" == "false" ]]; then
             echo "Nim lint checks failed"
+            exit 1
+          fi
+        elif [[ "${{ matrix.type }}" == "rust" ]]; then
+          if [[ "${{ env.RUST_PASSED }}" == "false" ]]; then
+            echo "Rust lint checks failed"
+            exit 1
+          fi
+        elif [[ "${{ matrix.type }}" == "crystal" ]]; then
+          if [[ "${{ env.CRYSTAL_PASSED }}" == "false" ]]; then
+            echo "Crystal lint checks failed"
+            exit 1
+          fi
+        elif [[ "${{ matrix.type }}" == "v" ]]; then
+          if [[ "${{ env.V_PASSED }}" == "false" ]]; then
+            echo "V lint checks failed"
+            exit 1
+          fi
+        elif [[ "${{ matrix.type }}" == "cpp" ]]; then
+          if [[ "${{ env.CPP_PASSED }}" == "false" ]]; then
+            echo "C++ lint checks failed"
+            exit 1
+          fi
+        elif [[ "${{ matrix.type }}" == "bash" ]]; then
+          if [[ "${{ env.BASH_PASSED }}" == "false" ]]; then
+            echo "Bash lint checks failed"
             exit 1
           fi
         fi

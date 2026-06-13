@@ -80,8 +80,8 @@ from rich.table import Table
 # =============================================================================
 # Literal["high", "medium", "low"] is a type hint that says "this string
 # can ONLY be one of these three values." Mypy will catch typos like
-# "hgih" at edit time. We chose Literal over an Enum because Carter's
-# style guide prefers Literals for small fixed sets
+# "hgih" at edit time. We chose Literal over an Enum because I
+# prefer Literals for small fixed sets
 
 Confidence = Literal["high", "medium", "low"]
 

@@ -1,0 +1,10 @@
+# ©AngelaMos | 2026
+# .shellcheckrc
+#
+# Disabled rules document false-positive systematic patterns in this project
+# SC2034: CURRENT_TEST / SYSROOT pattern read by test framework via introspection
+# SC1090: dynamic source paths in test runner (intentional discovery)
+# SC1091: helper-file sources resolved at runtime, not visible to shellcheck
+disable=SC2034
+disable=SC1090
+disable=SC1091

@@ -161,7 +161,7 @@ ftxui::Element View::render_bandwidth(const StatsSnapshot &data) {
 
 			const double frac = idx_f - static_cast<double>(i0);
 			const double bw = data.bandwidth_history[i0].bytes_per_sec * (1.0 - frac) +
-			                  data.bandwidth_history[i1].bytes_per_sec * frac;
+							  data.bandwidth_history[i1].bytes_per_sec * frac;
 
 			const double v = bw / max_bw;
 			output[x] = static_cast<int>(v * static_cast<double>(height - 1));

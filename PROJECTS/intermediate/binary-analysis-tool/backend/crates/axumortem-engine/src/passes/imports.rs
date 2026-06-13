@@ -47,6 +47,8 @@ use crate::error::EngineError;
 use crate::pass::{AnalysisPass, Sealed};
 use crate::types::Severity;
 
+type ImportsExportsLibs = (Vec<ImportEntry>, Vec<ExportEntry>, Vec<String>);
+
 pub struct SuspiciousApiDef {
     pub name: &'static str,
     pub tag: &'static str,
@@ -179,11 +181,7 @@ const SUSPICIOUS_COMBINATIONS: &[CombinationDef] = &[
         name: "Process Injection Chain",
         description: "VirtualAllocEx + WriteProcessMemory \
                       + CreateRemoteThread",
-        patterns: &[
-            "VirtualAllocEx",
-            "WriteProcessMemory",
-            "CreateRemoteThread",
-        ],
+        patterns: &["VirtualAllocEx", "WriteProcessMemory", "CreateRemoteThread"],
         mitre_id: "T1055",
         severity: Severity::Critical,
     },
@@ -211,50 +209,35 @@ const SUSPICIOUS_COMBINATIONS: &[CombinationDef] = &[
     CombinationDef {
         name: "DLL Injection",
         description: "LoadLibrary + CreateRemoteThread",
-        patterns: &[
-            "LoadLibrary*",
-            "CreateRemoteThread",
-        ],
+        patterns: &["LoadLibrary*", "CreateRemoteThread"],
         mitre_id: "T1055.001",
         severity: Severity::High,
     },
     CombinationDef {
         name: "Credential Theft",
         description: "OpenProcess + ReadProcessMemory",
-        patterns: &[
-            "OpenProcess",
-            "ReadProcessMemory",
-        ],
+        patterns: &["OpenProcess", "ReadProcessMemory"],
         mitre_id: "T1003",
         severity: Severity::Critical,
     },
     CombinationDef {
         name: "Service Persistence",
         description: "OpenSCManager + CreateService",
-        patterns: &[
-            "OpenSCManager*",
-            "CreateService*",
-        ],
+        patterns: &["OpenSCManager*", "CreateService*"],
         mitre_id: "T1543.003",
         severity: Severity::Medium,
     },
     CombinationDef {
         name: "Registry Persistence",
         description: "RegOpenKeyEx + RegSetValueEx",
-        patterns: &[
-            "RegOpenKeyEx*",
-            "RegSetValueEx*",
-        ],
+        patterns: &["RegOpenKeyEx*", "RegSetValueEx*"],
         mitre_id: "T1547.001",
         severity: Severity::Medium,
     },
     CombinationDef {
         name: "Download and Execute",
         description: "URLDownloadToFile + ShellExecute",
-        patterns: &[
-            "URLDownloadToFile*",
-            "ShellExecute*",
-        ],
+        patterns: &["URLDownloadToFile*", "ShellExecute*"],
         mitre_id: "T1105",
         severity: Severity::High,
     },
@@ -283,11 +266,7 @@ const SUSPICIOUS_COMBINATIONS: &[CombinationDef] = &[
         name: "Linux C2 Connection",
         description: "socket + connect + inet_pton \
                       hardcoded C2 address",
-        patterns: &[
-            "socket",
-            "connect",
-            "inet_pton",
-        ],
+        patterns: &["socket", "connect", "inet_pton"],
         mitre_id: "T1071",
         severity: Severity::High,
     },
@@ -295,12 +274,7 @@ const SUSPICIOUS_COMBINATIONS: &[CombinationDef] = &[
         name: "Linux Network Listener",
         description: "socket + bind + listen + accept \
                       backdoor listener",
-        patterns: &[
-            "socket",
-            "bind",
-            "listen",
-            "accept",
-        ],
+        patterns: &["socket", "bind", "listen", "accept"],
         mitre_id: "T1571",
         severity: Severity::High,
     },
@@ -327,8 +301,7 @@ pub struct ImportResult {
     pub imports: Vec<ImportEntry>,
     pub exports: Vec<ExportEntry>,
     pub libraries: Vec<String>,
-    pub suspicious_combinations:
-        Vec<SuspiciousCombination>,
+    pub suspicious_combinations: Vec<SuspiciousCombination>,
     pub mitre_mappings: Vec<MitreMapping>,
     pub statistics: ImportStatistics,
 }
@@ -389,43 +362,28 @@ impl AnalysisPass for ImportPass {
         &["format"]
     }
 
-    fn run(
-        &self,
-        ctx: &mut AnalysisContext,
-    ) -> Result<(), EngineError> {
+    fn run(&self, ctx: &mut AnalysisContext) -> Result<(), EngineError> {
         let result = analyze_imports(ctx.data())?;
         ctx.import_result = Some(result);
         Ok(())
     }
 }
 
-fn analyze_imports(
-    data: &[u8],
-) -> Result<ImportResult, EngineError> {
-    let object =
-        goblin::Object::parse(data).map_err(|e| {
-            EngineError::InvalidBinary {
-                reason: e.to_string(),
-            }
-        })?;
+fn analyze_imports(data: &[u8]) -> Result<ImportResult, EngineError> {
+    let object = goblin::Object::parse(data).map_err(|e| EngineError::InvalidBinary {
+        reason: e.to_string(),
+    })?;
 
     let (imports, exports, libraries) = match &object {
         goblin::Object::Elf(elf) => extract_elf(elf),
         goblin::Object::PE(pe) => extract_pe(pe),
-        goblin::Object::Mach(mach) => {
-            extract_mach(mach, data)?
-        }
+        goblin::Object::Mach(mach) => extract_mach(mach, data)?,
         _ => (Vec::new(), Vec::new(), Vec::new()),
     };
 
-    let suspicious_combinations =
-        detect_combinations(&imports);
-    let mitre_mappings =
-        collect_mitre_mappings(&imports);
-    let suspicious_count = imports
-        .iter()
-        .filter(|i| i.is_suspicious)
-        .count();
+    let suspicious_combinations = detect_combinations(&imports);
+    let mitre_mappings = collect_mitre_mappings(&imports);
+    let suspicious_count = imports.iter().filter(|i| i.is_suspicious).count();
 
     let statistics = ImportStatistics {
         total_imports: imports.len(),
@@ -444,29 +402,19 @@ fn analyze_imports(
     })
 }
 
-fn extract_elf(
-    elf: &goblin::elf::Elf,
-) -> (Vec<ImportEntry>, Vec<ExportEntry>, Vec<String>) {
-    let libraries: Vec<String> = elf
-        .libraries
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+fn extract_elf(elf: &goblin::elf::Elf) -> ImportsExportsLibs {
+    let libraries: Vec<String> = elf.libraries.iter().map(|s| s.to_string()).collect();
 
     let mut imports = Vec::new();
     for sym in elf.dynsyms.iter() {
         if !sym.is_import() || sym.st_name == 0 {
             continue;
         }
-        let name = elf
-            .dynstrtab
-            .get_at(sym.st_name)
-            .unwrap_or("");
+        let name = elf.dynstrtab.get_at(sym.st_name).unwrap_or("");
         if name.is_empty() {
             continue;
         }
-        let (is_suspicious, threat_tags) =
-            flag_suspicious(name);
+        let (is_suspicious, threat_tags) = flag_suspicious(name);
         imports.push(ImportEntry {
             library: String::new(),
             function: name.to_string(),
@@ -479,16 +427,10 @@ fn extract_elf(
 
     let mut exports = Vec::new();
     for sym in elf.dynsyms.iter() {
-        if sym.is_import()
-            || sym.st_value == 0
-            || sym.st_name == 0
-        {
+        if sym.is_import() || sym.st_value == 0 || sym.st_name == 0 {
             continue;
         }
-        let name = elf
-            .dynstrtab
-            .get_at(sym.st_name)
-            .unwrap_or("");
+        let name = elf.dynstrtab.get_at(sym.st_name).unwrap_or("");
         if name.is_empty() {
             continue;
         }
@@ -504,17 +446,14 @@ fn extract_elf(
     (imports, exports, libraries)
 }
 
-fn extract_pe(
-    pe: &goblin::pe::PE,
-) -> (Vec<ImportEntry>, Vec<ExportEntry>, Vec<String>) {
+fn extract_pe(pe: &goblin::pe::PE) -> ImportsExportsLibs {
     let mut lib_set = HashSet::new();
     let mut imports = Vec::new();
 
     for import in &pe.imports {
         let dll = import.dll.to_string();
         lib_set.insert(dll.clone());
-        let (is_suspicious, threat_tags) =
-            flag_suspicious(&import.name);
+        let (is_suspicious, threat_tags) = flag_suspicious(&import.name);
         imports.push(ImportEntry {
             library: dll,
             function: import.name.to_string(),
@@ -528,17 +467,12 @@ fn extract_pe(
     let mut exports = Vec::new();
     for export in &pe.exports {
         let is_forwarded = export.reexport.is_some();
-        let forward_target =
-            export.reexport.as_ref().map(|r| match r {
-                goblin::pe::export::Reexport::DLLName {
-                    export: name,
-                    lib,
-                } => format!("{lib}!{name}"),
-                goblin::pe::export::Reexport::DLLOrdinal {
-                    ordinal,
-                    lib,
-                } => format!("{lib}!#{ordinal}"),
-            });
+        let forward_target = export.reexport.as_ref().map(|r| match r {
+            goblin::pe::export::Reexport::DLLName { export: name, lib } => format!("{lib}!{name}"),
+            goblin::pe::export::Reexport::DLLOrdinal { ordinal, lib } => {
+                format!("{lib}!#{ordinal}")
+            }
+        });
         exports.push(ExportEntry {
             name: export.name.map(|s| s.to_string()),
             address: export.rva as u64,
@@ -548,38 +482,24 @@ fn extract_pe(
         });
     }
 
-    let libraries: Vec<String> =
-        lib_set.into_iter().collect();
+    let libraries: Vec<String> = lib_set.into_iter().collect();
     (imports, exports, libraries)
 }
 
-fn extract_mach(
-    mach: &goblin::mach::Mach,
-    data: &[u8],
-) -> Result<
-    (Vec<ImportEntry>, Vec<ExportEntry>, Vec<String>),
-    EngineError,
-> {
+fn extract_mach(mach: &goblin::mach::Mach, data: &[u8]) -> Result<ImportsExportsLibs, EngineError> {
     match mach {
-        goblin::mach::Mach::Binary(macho) => {
-            Ok(extract_single_macho(macho))
-        }
+        goblin::mach::Mach::Binary(macho) => Ok(extract_single_macho(macho)),
         goblin::mach::Mach::Fat(fat) => {
-            for arch in fat.iter_arches() {
-                let arch = arch.map_err(|e| {
-                    EngineError::InvalidBinary {
-                        reason: e.to_string(),
-                    }
+            if let Some(arch) = fat.iter_arches().next() {
+                let arch = arch.map_err(|e| EngineError::InvalidBinary {
+                    reason: e.to_string(),
                 })?;
-                let macho = goblin::mach::MachO::parse(
-                    data,
-                    arch.offset as usize,
-                )
-                .map_err(|e| {
-                    EngineError::InvalidBinary {
-                        reason: e.to_string(),
-                    }
-                })?;
+                let macho =
+                    goblin::mach::MachO::parse(data, arch.offset as usize).map_err(|e| {
+                        EngineError::InvalidBinary {
+                            reason: e.to_string(),
+                        }
+                    })?;
                 return Ok(extract_single_macho(&macho));
             }
             Ok((Vec::new(), Vec::new(), Vec::new()))
@@ -587,14 +507,11 @@ fn extract_mach(
     }
 }
 
-fn extract_single_macho(
-    macho: &goblin::mach::MachO,
-) -> (Vec<ImportEntry>, Vec<ExportEntry>, Vec<String>) {
+fn extract_single_macho(macho: &goblin::mach::MachO) -> ImportsExportsLibs {
     let mut imports = Vec::new();
     if let Ok(macho_imports) = macho.imports() {
         for imp in &macho_imports {
-            let (is_suspicious, threat_tags) =
-                flag_suspicious(imp.name);
+            let (is_suspicious, threat_tags) = flag_suspicious(imp.name);
             imports.push(ImportEntry {
                 library: imp.dylib.to_string(),
                 function: imp.name.to_string(),
@@ -629,9 +546,7 @@ fn extract_single_macho(
     (imports, exports, libraries)
 }
 
-fn flag_suspicious(
-    name: &str,
-) -> (bool, Vec<String>) {
+fn flag_suspicious(name: &str) -> (bool, Vec<String>) {
     let mut tags = Vec::new();
     for api in SUSPICIOUS_APIS {
         if matches_api(name, api.name) {
@@ -642,24 +557,17 @@ fn flag_suspicious(
     (is_suspicious, tags)
 }
 
-fn matches_api(
-    import_name: &str,
-    api_name: &str,
-) -> bool {
+fn matches_api(import_name: &str, api_name: &str) -> bool {
     if import_name == api_name {
         return true;
     }
-    if import_name.starts_with(api_name) {
-        let suffix = &import_name[api_name.len()..];
+    if let Some(suffix) = import_name.strip_prefix(api_name) {
         return suffix == "A" || suffix == "W";
     }
     false
 }
 
-fn matches_pattern(
-    import_name: &str,
-    pattern: &str,
-) -> bool {
+fn matches_pattern(import_name: &str, pattern: &str) -> bool {
     if let Some(prefix) = pattern.strip_suffix('*') {
         import_name.starts_with(prefix)
     } else {
@@ -667,13 +575,8 @@ fn matches_pattern(
     }
 }
 
-fn detect_combinations(
-    imports: &[ImportEntry],
-) -> Vec<SuspiciousCombination> {
-    let function_names: Vec<&str> = imports
-        .iter()
-        .map(|i| i.function.as_str())
-        .collect();
+fn detect_combinations(imports: &[ImportEntry]) -> Vec<SuspiciousCombination> {
+    let function_names: Vec<&str> = imports.iter().map(|i| i.function.as_str()).collect();
     let mut results = Vec::new();
     let mut seen = HashSet::new();
 
@@ -681,12 +584,11 @@ fn detect_combinations(
         if seen.contains(combo.name) {
             continue;
         }
-        let all_matched =
-            combo.patterns.iter().all(|pattern| {
-                function_names.iter().any(|name| {
-                    matches_pattern(name, pattern)
-                })
-            });
+        let all_matched = combo.patterns.iter().all(|pattern| {
+            function_names
+                .iter()
+                .any(|name| matches_pattern(name, pattern))
+        });
         if !all_matched {
             continue;
         }
@@ -697,9 +599,7 @@ fn detect_combinations(
             .filter_map(|pattern| {
                 function_names
                     .iter()
-                    .find(|name| {
-                        matches_pattern(name, pattern)
-                    })
+                    .find(|name| matches_pattern(name, pattern))
                     .map(|name| name.to_string())
             })
             .collect();
@@ -717,18 +617,14 @@ fn detect_combinations(
     results
 }
 
-fn collect_mitre_mappings(
-    imports: &[ImportEntry],
-) -> Vec<MitreMapping> {
+fn collect_mitre_mappings(imports: &[ImportEntry]) -> Vec<MitreMapping> {
     let mut mappings = Vec::new();
     for import in imports {
         if !import.is_suspicious {
             continue;
         }
         for api in SUSPICIOUS_APIS {
-            if matches_api(&import.function, api.name)
-                && !api.mitre_id.is_empty()
-            {
+            if matches_api(&import.function, api.name) && !api.mitre_id.is_empty() {
                 mappings.push(MitreMapping {
                     technique_id: api.mitre_id.into(),
                     api: import.function.clone(),
@@ -748,13 +644,8 @@ mod tests {
     use crate::context::BinarySource;
 
     fn load_fixture(name: &str) -> Vec<u8> {
-        let path = format!(
-            "{}/tests/fixtures/{name}",
-            env!("CARGO_MANIFEST_DIR"),
-        );
-        std::fs::read(&path).unwrap_or_else(|e| {
-            panic!("fixture {path}: {e}")
-        })
+        let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
     }
 
     fn make_ctx(data: Vec<u8>) -> AnalysisContext {
@@ -770,13 +661,9 @@ mod tests {
     #[test]
     fn elf_imports_extracted() {
         let data = load_fixture("hello_elf");
-        let result =
-            analyze_imports(&data).unwrap();
+        let result = analyze_imports(&data).unwrap();
 
-        assert!(
-            !result.imports.is_empty(),
-            "ELF binary should have imports"
-        );
+        assert!(!result.imports.is_empty(), "ELF binary should have imports");
         assert!(
             !result.libraries.is_empty(),
             "ELF binary should list needed libraries"
@@ -786,20 +673,15 @@ mod tests {
 
     #[test]
     fn suspicious_api_flagging() {
-        let (is_suspicious, tags) =
-            flag_suspicious("VirtualAllocEx");
+        let (is_suspicious, tags) = flag_suspicious("VirtualAllocEx");
         assert!(is_suspicious);
         assert!(tags.contains(&"injection".to_string()));
 
-        let (is_suspicious, tags) =
-            flag_suspicious("RegSetValueExW");
+        let (is_suspicious, tags) = flag_suspicious("RegSetValueExW");
         assert!(is_suspicious);
-        assert!(tags.contains(
-            &"persistence".to_string()
-        ));
+        assert!(tags.contains(&"persistence".to_string()));
 
-        let (is_suspicious, _) =
-            flag_suspicious("printf");
+        let (is_suspicious, _) = flag_suspicious("printf");
         assert!(!is_suspicious);
     }
 
@@ -812,9 +694,7 @@ mod tests {
                 address: None,
                 ordinal: None,
                 is_suspicious: true,
-                threat_tags: vec![
-                    "injection".into(),
-                ],
+                threat_tags: vec!["injection".into()],
             },
             ImportEntry {
                 library: "kernel32.dll".into(),
@@ -822,9 +702,7 @@ mod tests {
                 address: None,
                 ordinal: None,
                 is_suspicious: true,
-                threat_tags: vec![
-                    "injection".into(),
-                ],
+                threat_tags: vec!["injection".into()],
             },
             ImportEntry {
                 library: "kernel32.dll".into(),
@@ -832,23 +710,15 @@ mod tests {
                 address: None,
                 ordinal: None,
                 is_suspicious: true,
-                threat_tags: vec![
-                    "injection".into(),
-                ],
+                threat_tags: vec!["injection".into()],
             },
         ];
 
         let combos = detect_combinations(&imports);
         assert_eq!(combos.len(), 1);
-        assert_eq!(
-            combos[0].name,
-            "Process Injection Chain"
-        );
+        assert_eq!(combos[0].name, "Process Injection Chain");
         assert_eq!(combos[0].mitre_id, "T1055");
-        assert_eq!(
-            combos[0].severity,
-            Severity::Critical
-        );
+        assert_eq!(combos[0].severity, Severity::Critical);
     }
 
     #[test]
@@ -868,17 +738,12 @@ mod tests {
                 address: None,
                 ordinal: None,
                 is_suspicious: true,
-                threat_tags: vec![
-                    "persistence".into(),
-                ],
+                threat_tags: vec!["persistence".into()],
             },
         ];
 
         let combos = detect_combinations(&imports);
-        assert!(combos
-            .iter()
-            .any(|c| c.name
-                == "Registry Persistence"));
+        assert!(combos.iter().any(|c| c.name == "Registry Persistence"));
     }
 
     #[test]
@@ -894,8 +759,7 @@ mod tests {
 
         let combos = detect_combinations(&imports);
         assert!(
-            !combos.iter().any(|c| c.name
-                == "Process Injection Chain"),
+            !combos.iter().any(|c| c.name == "Process Injection Chain"),
             "should not detect chain with only one API"
         );
     }
@@ -909,9 +773,7 @@ mod tests {
                 address: None,
                 ordinal: None,
                 is_suspicious: true,
-                threat_tags: vec![
-                    "injection".into(),
-                ],
+                threat_tags: vec!["injection".into()],
             },
             ImportEntry {
                 library: String::new(),
@@ -923,13 +785,9 @@ mod tests {
             },
         ];
 
-        let mappings =
-            collect_mitre_mappings(&imports);
+        let mappings = collect_mitre_mappings(&imports);
         assert_eq!(mappings.len(), 1);
-        assert_eq!(
-            mappings[0].technique_id,
-            "T1055.008"
-        );
+        assert_eq!(mappings[0].technique_id, "T1055.008");
         assert_eq!(mappings[0].api, "ptrace");
     }
 

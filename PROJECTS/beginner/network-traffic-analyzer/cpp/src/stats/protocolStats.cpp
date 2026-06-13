@@ -2,7 +2,7 @@
 #include "ftxui/dom/table.hpp"
 #include <fstream>
 
-Stats::Stats() { last_tick = std::chrono::steady_clock::now(); }
+Stats::Stats() : last_tick(std::chrono::steady_clock::now()) {}
 /**
  * @brief Aggregates a newly captured packet.
  *
@@ -96,7 +96,7 @@ void Stats::update_transport_stats() {
 	snapshot.transport_rows.push_back({"Proto", "Packets", "Bytes", "%"});
 
 	std::vector<std::pair<TransportProtocol, protocolStats>> tps(transport_map.begin(), transport_map.end());
-	std::sort(tps.begin(), tps.end(), [](auto &a, auto &b) { return a.second.packets > b.second.packets; });
+	std::sort(tps.begin(), tps.end(), [](const auto &a, const auto &b) { return a.second.packets > b.second.packets; });
 
 	for (const auto &[proto, stats] : tps) {
 		double percent = snapshot.total_b ? stats.bytes * 100.0 / snapshot.total_b : 0.0;
@@ -116,7 +116,8 @@ void Stats::update_application_stats() {
 	std::lock_guard<std::mutex> lock(mtx);
 	std::vector<std::pair<ApplicationProtocol, protocolStats>> apps(application_map.begin(), application_map.end());
 
-	std::sort(apps.begin(), apps.end(), [](auto &a, auto &b) { return a.second.packets > b.second.packets; });
+	std::sort(apps.begin(), apps.end(),
+			  [](const auto &a, const auto &b) { return a.second.packets > b.second.packets; });
 
 	snapshot.app_rows.clear();
 	snapshot.app_rows.push_back({"Proto", "Packets", "Bytes (MB)", "%"});
@@ -144,7 +145,8 @@ void Stats::update_ip_stats(size_t limit) {
 	snapshot.rows.push_back({"IP Address", "Packets TX", "Packets RX"});
 	std::vector<std::pair<std::string, IPStats>> ips(ip_map.begin(), ip_map.end());
 
-	std::sort(ips.begin(), ips.end(), [](auto &a, auto &b) { return a.second.packets_sent > b.second.packets_sent; });
+	std::sort(ips.begin(), ips.end(),
+			  [](const auto &a, const auto &b) { return a.second.packets_sent > b.second.packets_sent; });
 
 	size_t count = 0;
 	for (const auto &[ip, s] : ips) {
@@ -166,7 +168,7 @@ void Stats::update_ip_stats(size_t limit) {
 void Stats::update_pairs(size_t limit) {
 	std::lock_guard<std::mutex> lock(mtx);
 	std::vector<std::pair<std::pair<std::string, std::string>, protocolStats>> vec(pairs.begin(), pairs.end());
-	std::sort(vec.begin(), vec.end(), [](auto &a, auto &b) { return a.second.bytes > b.second.bytes; });
+	std::sort(vec.begin(), vec.end(), [](const auto &a, const auto &b) { return a.second.bytes > b.second.bytes; });
 
 	snapshot.pairs_rows.clear();
 	snapshot.pairs_rows.push_back({"Source", "Destination", "bytes received", "%"});

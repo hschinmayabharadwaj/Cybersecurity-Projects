@@ -10,10 +10,7 @@ const PAGE_SIZE = 50
 
 export function EventsPage() {
   const [ipFilter, setIpFilter] = useState('')
-  const { data: events, isLoading } = useEvents(
-    PAGE_SIZE,
-    ipFilter || undefined
-  )
+  const { data: events, isLoading } = useEvents(PAGE_SIZE, ipFilter || undefined)
 
   return (
     <div className={styles.page}>

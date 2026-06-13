@@ -9,9 +9,5 @@ interface ServiceBadgeProps {
 }
 
 export function ServiceBadge({ service }: ServiceBadgeProps) {
-  return (
-    <span className={styles.badge}>
-      {service.toUpperCase()}
-    </span>
-  )
+  return <span className={styles.badge}>{service.toUpperCase()}</span>
 }

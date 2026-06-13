@@ -2,8 +2,8 @@
 // event-feed.tsx
 
 import { useWebSocketStore } from '@/core/lib/websocket.store'
-import { ServiceBadge } from './service-badge'
 import styles from './event-feed.module.scss'
+import { ServiceBadge } from './service-badge'
 
 const MAX_VISIBLE = 15
 

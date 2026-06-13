@@ -44,9 +44,7 @@ export function SessionDetailPage() {
         &#8592; SESSIONS
       </Link>
 
-      <h1 className={styles.detailTitle}>
-        SESSION {session.id.slice(0, 8)}
-      </h1>
+      <h1 className={styles.detailTitle}>SESSION {session.id.slice(0, 8)}</h1>
 
       <div className={styles.dossier}>
         {rows.map((row) => (

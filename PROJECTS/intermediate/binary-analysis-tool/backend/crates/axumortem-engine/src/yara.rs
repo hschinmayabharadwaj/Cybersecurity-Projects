@@ -271,58 +271,38 @@ pub struct YaraScanner {
 impl YaraScanner {
     pub fn new() -> Result<Self, EngineError> {
         let mut compiler = yara_x::Compiler::new();
-        compiler.add_source(BUILTIN_RULES).map_err(
-            |e| EngineError::Yara(e.to_string()),
-        )?;
+        compiler
+            .add_source(BUILTIN_RULES)
+            .map_err(|e| EngineError::Yara(e.to_string()))?;
 
         Ok(Self {
             rules: compiler.build(),
         })
     }
 
-    pub fn with_custom_rules(
-        rules_dir: &Path,
-    ) -> Result<Self, EngineError> {
+    pub fn with_custom_rules(rules_dir: &Path) -> Result<Self, EngineError> {
         let mut compiler = yara_x::Compiler::new();
-        compiler.add_source(BUILTIN_RULES).map_err(
-            |e| EngineError::Yara(e.to_string()),
-        )?;
+        compiler
+            .add_source(BUILTIN_RULES)
+            .map_err(|e| EngineError::Yara(e.to_string()))?;
 
         if rules_dir.is_dir() {
             for entry in std::fs::read_dir(rules_dir)
-                .map_err(|e| {
-                    EngineError::Yara(format!(
-                        "failed to read rules dir: {e}"
-                    ))
-                })?
+                .map_err(|e| EngineError::Yara(format!("failed to read rules dir: {e}")))?
             {
-                let entry = entry.map_err(|e| {
-                    EngineError::Yara(format!(
-                        "dir entry error: {e}"
-                    ))
-                })?;
+                let entry =
+                    entry.map_err(|e| EngineError::Yara(format!("dir entry error: {e}")))?;
                 let path = entry.path();
                 if path
                     .extension()
                     .is_some_and(|ext| ext == "yar" || ext == "yara")
                 {
-                    let source = std::fs::read_to_string(
-                        &path,
-                    )
-                    .map_err(|e| {
-                        EngineError::Yara(format!(
-                            "failed to read {}: {e}",
-                            path.display()
-                        ))
+                    let source = std::fs::read_to_string(&path).map_err(|e| {
+                        EngineError::Yara(format!("failed to read {}: {e}", path.display()))
                     })?;
-                    compiler
-                        .add_source(source.as_str())
-                        .map_err(|e| {
-                            EngineError::Yara(format!(
-                                "compile error in {}: {e}",
-                                path.display()
-                            ))
-                        })?;
+                    compiler.add_source(source.as_str()).map_err(|e| {
+                        EngineError::Yara(format!("compile error in {}: {e}", path.display()))
+                    })?;
                 }
             }
         }
@@ -332,22 +312,15 @@ impl YaraScanner {
         })
     }
 
-    pub fn scan(
-        &self,
-        data: &[u8],
-    ) -> Result<Vec<YaraMatch>, EngineError> {
-        let mut scanner =
-            yara_x::Scanner::new(&self.rules);
-        let results = scanner.scan(data).map_err(
-            |e| EngineError::Yara(e.to_string()),
-        )?;
+    pub fn scan(&self, data: &[u8]) -> Result<Vec<YaraMatch>, EngineError> {
+        let mut scanner = yara_x::Scanner::new(&self.rules);
+        let results = scanner
+            .scan(data)
+            .map_err(|e| EngineError::Yara(e.to_string()))?;
 
         let mut matches = Vec::new();
         for rule in results.matching_rules() {
-            let tags: Vec<String> = rule
-                .tags()
-                .map(|t| t.identifier().to_string())
-                .collect();
+            let tags: Vec<String> = rule.tags().map(|t| t.identifier().to_string()).collect();
 
             let mut description = None;
             let mut category = None;
@@ -356,20 +329,17 @@ impl YaraScanner {
                 match key {
                     "description" => {
                         if let yara_x::MetaValue::String(s) = value {
-                            description =
-                                Some(s.to_string());
+                            description = Some(s.to_string());
                         }
                     }
                     "category" => {
                         if let yara_x::MetaValue::String(s) = value {
-                            category =
-                                Some(s.to_string());
+                            category = Some(s.to_string());
                         }
                     }
                     "severity" => {
                         if let yara_x::MetaValue::String(s) = value {
-                            severity =
-                                Some(s.to_string());
+                            severity = Some(s.to_string());
                         }
                     }
                     _ => {}
@@ -378,25 +348,18 @@ impl YaraScanner {
 
             let mut matched_strings = Vec::new();
             for pattern in rule.patterns() {
-                let id = pattern
-                    .identifier()
-                    .to_string();
-                let count =
-                    pattern.matches().count();
+                let id = pattern.identifier().to_string();
+                let count = pattern.matches().count();
                 if count > 0 {
-                    matched_strings.push(
-                        YaraStringMatch {
-                            identifier: id,
-                            match_count: count,
-                        },
-                    );
+                    matched_strings.push(YaraStringMatch {
+                        identifier: id,
+                        match_count: count,
+                    });
                 }
             }
 
             matches.push(YaraMatch {
-                rule_name: rule
-                    .identifier()
-                    .to_string(),
+                rule_name: rule.identifier().to_string(),
                 tags,
                 metadata: YaraMetadata {
                     description,
@@ -435,42 +398,25 @@ mod tests {
         let upx_match = result
             .iter()
             .find(|m| m.rule_name == "suspicious_upx_packed");
-        assert!(
-            upx_match.is_some(),
-            "should detect UPX packer signature"
-        );
-        let meta =
-            &upx_match.unwrap().metadata;
-        assert_eq!(
-            meta.category.as_deref(),
-            Some("packer")
-        );
+        assert!(upx_match.is_some(), "should detect UPX packer signature");
+        let meta = &upx_match.unwrap().metadata;
+        assert_eq!(meta.category.as_deref(), Some("packer"));
     }
 
     #[test]
     fn detects_process_injection() {
         let mut data = Vec::new();
-        data.extend_from_slice(
-            b"\x00\x00VirtualAllocEx\x00\x00",
-        );
-        data.extend_from_slice(
-            b"\x00\x00WriteProcessMemory\x00\x00",
-        );
-        data.extend_from_slice(
-            b"\x00\x00CreateRemoteThread\x00\x00",
-        );
+        data.extend_from_slice(b"\x00\x00VirtualAllocEx\x00\x00");
+        data.extend_from_slice(b"\x00\x00WriteProcessMemory\x00\x00");
+        data.extend_from_slice(b"\x00\x00CreateRemoteThread\x00\x00");
         data.extend_from_slice(&[0u8; 256]);
 
         let scanner = YaraScanner::new().unwrap();
         let result = scanner.scan(&data).unwrap();
-        let injection = result.iter().find(|m| {
-            m.rule_name
-                == "suspicious_process_injection"
-        });
-        assert!(
-            injection.is_some(),
-            "should detect process injection APIs"
-        );
+        let injection = result
+            .iter()
+            .find(|m| m.rule_name == "suspicious_process_injection");
+        assert!(injection.is_some(), "should detect process injection APIs");
     }
 
     #[test]
@@ -480,9 +426,7 @@ mod tests {
         let result = scanner.scan(data).unwrap();
         let suspicious: Vec<_> = result
             .iter()
-            .filter(|m| {
-                m.rule_name != "suspicious_obfuscation"
-            })
+            .filter(|m| m.rule_name != "suspicious_obfuscation")
             .collect();
         assert!(
             suspicious.is_empty(),
@@ -492,13 +436,8 @@ mod tests {
     }
 
     fn load_fixture(name: &str) -> Vec<u8> {
-        let path = format!(
-            "{}/tests/fixtures/{name}",
-            env!("CARGO_MANIFEST_DIR"),
-        );
-        std::fs::read(&path).unwrap_or_else(|e| {
-            panic!("fixture {path}: {e}")
-        })
+        let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"),);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("fixture {path}: {e}"))
     }
 
     #[test]

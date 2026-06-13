@@ -25,10 +25,7 @@ pub enum EngineError {
     UnsupportedArchitecture { arch: String },
 
     #[error("pass '{pass}' missing dependency: {dependency}")]
-    MissingDependency {
-        pass: String,
-        dependency: String,
-    },
+    MissingDependency { pass: String, dependency: String },
 
     #[error("pass '{pass}' failed")]
     PassFailed {

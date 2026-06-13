@@ -61,12 +61,7 @@ pub struct AnalysisContext {
 }
 
 impl AnalysisContext {
-    pub fn new(
-        source: BinarySource,
-        sha256: String,
-        file_name: String,
-        file_size: u64,
-    ) -> Self {
+    pub fn new(source: BinarySource, sha256: String, file_name: String, file_size: u64) -> Self {
         Self {
             source,
             sha256,

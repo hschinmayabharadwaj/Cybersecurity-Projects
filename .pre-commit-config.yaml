@@ -84,6 +84,37 @@ repos:
         files: ^PROJECTS/advanced/ai-threat-detection/backend/
         exclude: (\.venv|__pycache__|\.pytest_cache)/
 
+      - id: ruff
+        name: ruff check (dlp-scanner)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^PROJECTS/intermediate/dlp-scanner/
+        exclude: (\.venv|__pycache__|\.pytest_cache)/
+
+      - id: ruff
+        name: ruff check (linux-ebpf-security-tracer)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^PROJECTS/beginner/linux-ebpf-security-tracer/
+        exclude: (\.venv|__pycache__|\.pytest_cache)/
+
+      # Foundations projects
+      - id: ruff
+        name: ruff check (hash-identifier)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^PROJECTS/foundations/hash-identifier/
+        exclude: (\.venv|__pycache__|\.pytest_cache)/
+
+      - id: ruff
+        name: ruff check (http-headers-scanner)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^PROJECTS/foundations/http-headers-scanner/
+        exclude: (\.venv|__pycache__|\.pytest_cache)/
+
+      - id: ruff
+        name: ruff check (password-manager)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^PROJECTS/foundations/password-manager/
+        exclude: (\.venv|__pycache__|\.pytest_cache)/
+
 
   # Go golangci-lint Checks
   - repo: local
@@ -109,6 +140,48 @@ repos:
         entry: bash -c 'cd PROJECTS/intermediate/secrets-scanner && golangci-lint run --fix'
         language: system
         files: ^PROJECTS/intermediate/secrets-scanner/
+        types: [go]
+        pass_filenames: false
+
+      - id: golangci-lint-canary-token-generator
+        name: golangci-lint (canary-token-generator backend)
+        entry: bash -c 'cd PROJECTS/beginner/canary-token-generator/backend && golangci-lint run --fix'
+        language: system
+        files: ^PROJECTS/beginner/canary-token-generator/backend/
+        types: [go]
+        pass_filenames: false
+
+      - id: golangci-lint-systemd-persistence-scanner
+        name: golangci-lint (systemd-persistence-scanner)
+        entry: bash -c 'cd PROJECTS/beginner/systemd-persistence-scanner && golangci-lint run --fix'
+        language: system
+        files: ^PROJECTS/beginner/systemd-persistence-scanner/
+        types: [go]
+        pass_filenames: false
+
+      - id: golangci-lint-sbom-generator
+        name: golangci-lint (sbom-generator-vulnerability-matcher)
+        entry: bash -c 'cd PROJECTS/intermediate/sbom-generator-vulnerability-matcher && golangci-lint run --fix'
+        language: system
+        files: ^PROJECTS/intermediate/sbom-generator-vulnerability-matcher/
+        exclude: ^PROJECTS/intermediate/sbom-generator-vulnerability-matcher/testdata/
+        types: [go]
+        pass_filenames: false
+
+      - id: golangci-lint-honeypot-network
+        name: golangci-lint (honeypot-network)
+        entry: bash -c 'cd PROJECTS/advanced/honeypot-network && golangci-lint run --fix'
+        language: system
+        files: ^PROJECTS/advanced/honeypot-network/
+        exclude: ^PROJECTS/advanced/honeypot-network/frontend/
+        types: [go]
+        pass_filenames: false
+
+      - id: golangci-lint-monitor-the-situation-dashboard
+        name: golangci-lint (monitor-the-situation-dashboard backend)
+        entry: bash -c 'cd PROJECTS/advanced/monitor-the-situation-dashboard/backend && golangci-lint run --fix'
+        language: system
+        files: ^PROJECTS/advanced/monitor-the-situation-dashboard/backend/
         types: [go]
         pass_filenames: false
 
@@ -150,6 +223,41 @@ repos:
         files: ^PROJECTS/advanced/encrypted-p2p-chat/frontend/src/
         pass_filenames: false
 
+      - id: biome-canary-token-generator
+        name: biome check (canary-token-generator frontend)
+        entry: bash -c 'cd PROJECTS/beginner/canary-token-generator/frontend && npx @biomejs/biome check .'
+        language: system
+        files: ^PROJECTS/beginner/canary-token-generator/frontend/src/
+        pass_filenames: false
+
+      - id: biome-ai-threat-detection
+        name: biome check (ai-threat-detection frontend)
+        entry: bash -c 'cd PROJECTS/advanced/ai-threat-detection/frontend && npx @biomejs/biome check .'
+        language: system
+        files: ^PROJECTS/advanced/ai-threat-detection/frontend/src/
+        pass_filenames: false
+
+      - id: biome-binary-analysis-tool
+        name: biome check (binary-analysis-tool frontend)
+        entry: bash -c 'cd PROJECTS/intermediate/binary-analysis-tool/frontend && npx @biomejs/biome check .'
+        language: system
+        files: ^PROJECTS/intermediate/binary-analysis-tool/frontend/src/
+        pass_filenames: false
+
+      - id: biome-honeypot-network
+        name: biome check (honeypot-network frontend)
+        entry: bash -c 'cd PROJECTS/advanced/honeypot-network/frontend && npx @biomejs/biome check .'
+        language: system
+        files: ^PROJECTS/advanced/honeypot-network/frontend/src/
+        pass_filenames: false
+
+      - id: biome-monitor-the-situation-dashboard
+        name: biome check (monitor-the-situation-dashboard frontend)
+        entry: bash -c 'cd PROJECTS/advanced/monitor-the-situation-dashboard/frontend && npx @biomejs/biome check .'
+        language: system
+        files: ^PROJECTS/advanced/monitor-the-situation-dashboard/frontend/src/
+        pass_filenames: false
+
   # Nim nph Checks
   - repo: local
     hooks:
@@ -158,6 +266,130 @@ repos:
         entry: bash -c 'cd PROJECTS/intermediate/credential-enumeration && nph --check src/'
         language: system
         files: ^PROJECTS/intermediate/credential-enumeration/src/
+        pass_filenames: false
+
+  # Rust Checks (cargo fmt + clippy)
+  - repo: local
+    hooks:
+      - id: cargo-fmt-binary-analysis-tool
+        name: cargo fmt (binary-analysis-tool backend)
+        entry: bash -c 'cd PROJECTS/intermediate/binary-analysis-tool/backend && cargo fmt -- --check'
+        language: system
+        files: ^PROJECTS/intermediate/binary-analysis-tool/backend/
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-clippy-binary-analysis-tool
+        name: cargo clippy (binary-analysis-tool backend)
+        entry: bash -c 'cd PROJECTS/intermediate/binary-analysis-tool/backend && cargo clippy --all-targets --all-features -- -D warnings'
+        language: system
+        files: ^PROJECTS/intermediate/binary-analysis-tool/backend/
+        types: [rust]
+        pass_filenames: false
+
+  # Crystal Checks (format + ameba + compile)
+  - repo: local
+    hooks:
+      - id: crystal-format-credential-rotation-enforcer
+        name: crystal format check (credential-rotation-enforcer)
+        entry: bash -c 'cd PROJECTS/intermediate/credential-rotation-enforcer && crystal tool format --check src/ spec/'
+        language: system
+        files: ^PROJECTS/intermediate/credential-rotation-enforcer/
+        types_or: [crystal]
+        pass_filenames: false
+
+      - id: ameba-credential-rotation-enforcer
+        name: ameba (credential-rotation-enforcer)
+        entry: bash -c 'cd PROJECTS/intermediate/credential-rotation-enforcer && bin/ameba src/'
+        language: system
+        files: ^PROJECTS/intermediate/credential-rotation-enforcer/
+        types_or: [crystal]
+        pass_filenames: false
+
+      - id: crystal-build-check-credential-rotation-enforcer
+        name: crystal compile check (credential-rotation-enforcer)
+        entry: bash -c 'cd PROJECTS/intermediate/credential-rotation-enforcer && crystal build --no-codegen src/cre.cr'
+        language: system
+        files: ^PROJECTS/intermediate/credential-rotation-enforcer/
+        types_or: [crystal]
+        pass_filenames: false
+
+  # V (Vlang) Checks
+  - repo: local
+    hooks:
+      - id: v-fmt-firewall-rule-engine
+        name: v fmt (firewall-rule-engine)
+        entry: bash -c 'cd PROJECTS/beginner/firewall-rule-engine && v fmt -verify src/'
+        language: system
+        files: ^PROJECTS/beginner/firewall-rule-engine/src/
+        pass_filenames: false
+
+      - id: v-vet-firewall-rule-engine
+        name: v vet (firewall-rule-engine)
+        entry: bash -c 'cd PROJECTS/beginner/firewall-rule-engine && v vet src/'
+        language: system
+        files: ^PROJECTS/beginner/firewall-rule-engine/src/
+        pass_filenames: false
+
+  # C++ Checks (clang-format + cppcheck)
+  - repo: local
+    hooks:
+      - id: clang-format-hash-cracker
+        name: clang-format (hash-cracker)
+        entry: bash -c 'cd PROJECTS/beginner/hash-cracker && find . \( -path ./build -o -path ./cmake-build -o -path ./.git \) -prune -o \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print 2>/dev/null | xargs -r clang-format --dry-run --Werror'
+        language: system
+        files: ^PROJECTS/beginner/hash-cracker/
+        types_or: [c++, c]
+        pass_filenames: false
+
+      - id: cppcheck-hash-cracker
+        name: cppcheck (hash-cracker)
+        entry: bash -c 'cd PROJECTS/beginner/hash-cracker && cppcheck --enable=warning,style,performance,portability --error-exitcode=1 --suppress=missingIncludeSystem --suppress=normalCheckLevelMaxBranches -i build -i cmake-build -q .'
+        language: system
+        files: ^PROJECTS/beginner/hash-cracker/
+        types_or: [c++, c]
+        pass_filenames: false
+
+      - id: clang-format-simple-port-scanner
+        name: clang-format (simple-port-scanner)
+        entry: bash -c 'cd PROJECTS/beginner/simple-port-scanner && find . \( -path ./build -o -path ./cmake-build -o -path ./.git \) -prune -o \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print 2>/dev/null | xargs -r clang-format --dry-run --Werror'
+        language: system
+        files: ^PROJECTS/beginner/simple-port-scanner/
+        types_or: [c++, c]
+        pass_filenames: false
+
+      - id: cppcheck-simple-port-scanner
+        name: cppcheck (simple-port-scanner)
+        entry: bash -c 'cd PROJECTS/beginner/simple-port-scanner && cppcheck --enable=warning,style,performance,portability --error-exitcode=1 --suppress=missingIncludeSystem --suppress=normalCheckLevelMaxBranches -i build -i cmake-build -q .'
+        language: system
+        files: ^PROJECTS/beginner/simple-port-scanner/
+        types_or: [c++, c]
+        pass_filenames: false
+
+      - id: clang-format-network-traffic-analyzer-cpp
+        name: clang-format (network-traffic-analyzer/cpp)
+        entry: bash -c 'cd PROJECTS/beginner/network-traffic-analyzer/cpp && find . \( -path ./build -o -path ./cmake-build -o -path ./.git \) -prune -o \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print 2>/dev/null | xargs -r clang-format --dry-run --Werror'
+        language: system
+        files: ^PROJECTS/beginner/network-traffic-analyzer/cpp/
+        types_or: [c++, c]
+        pass_filenames: false
+
+      - id: cppcheck-network-traffic-analyzer-cpp
+        name: cppcheck (network-traffic-analyzer/cpp)
+        entry: bash -c 'cd PROJECTS/beginner/network-traffic-analyzer/cpp && cppcheck --enable=warning,style,performance,portability --error-exitcode=1 --suppress=missingIncludeSystem --suppress=normalCheckLevelMaxBranches -i build -i cmake-build -q .'
+        language: system
+        files: ^PROJECTS/beginner/network-traffic-analyzer/cpp/
+        types_or: [c++, c]
+        pass_filenames: false
+
+  # Bash (shellcheck)
+  - repo: local
+    hooks:
+      - id: shellcheck-linux-cis-hardening-auditor
+        name: shellcheck (linux-cis-hardening-auditor)
+        entry: bash -c 'find PROJECTS/beginner/linux-cis-hardening-auditor -name "*.sh" -not -path "*/.venv/*" | xargs -r shellcheck'
+        language: system
+        files: ^PROJECTS/beginner/linux-cis-hardening-auditor/.*\.sh$
         pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -174,9 +406,9 @@ repos:
       - id: check-symlinks
         exclude: (\.pnpm-store|node_modules)/
       - id: end-of-file-fixer
-        exclude: (\.pnpm-store|node_modules)/
+        exclude: (\.pnpm-store|node_modules)/|^PROJECTS/advanced/hsm-emulator/vendor/
       - id: trailing-whitespace
-        exclude: (\.pnpm-store|node_modules)/
+        exclude: (\.pnpm-store|node_modules)/|^PROJECTS/advanced/hsm-emulator/vendor/
       - id: check-illegal-windows-names
         exclude: (\.pnpm-store|node_modules)/
       - id: check-executables-have-shebangs

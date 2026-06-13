@@ -28,14 +28,11 @@
 use goblin::pe::PE;
 
 use super::{
+    FormatAnomaly, FormatResult, PeDllCharacteristics, PeInfo, SectionInfo, SegmentInfo,
     compute_section_hash, detect_common_anomalies,
-    FormatAnomaly, FormatResult, PeDllCharacteristics, PeInfo,
-    SectionInfo, SegmentInfo,
 };
 use crate::error::EngineError;
-use crate::types::{
-    Architecture, BinaryFormat, Endianness, SectionPermissions,
-};
+use crate::types::{Architecture, BinaryFormat, Endianness, SectionPermissions};
 
 const COFF_MACHINE_I386: u16 = 0x14c;
 const COFF_MACHINE_AMD64: u16 = 0x8664;
@@ -48,8 +45,7 @@ const IMAGE_SCN_MEM_WRITE: u32 = 0x8000_0000;
 const IMAGE_SCN_MEM_EXECUTE: u32 = 0x2000_0000;
 
 const IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE: u16 = 0x0040;
-const IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY: u16 =
-    0x0080;
+const IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY: u16 = 0x0080;
 const IMAGE_DLLCHARACTERISTICS_NX_COMPAT: u16 = 0x0100;
 const IMAGE_DLLCHARACTERISTICS_NO_SEH: u16 = 0x0400;
 const IMAGE_DLLCHARACTERISTICS_GUARD_CF: u16 = 0x4000;
@@ -70,43 +66,30 @@ const PE_TIMESTAMP_MAX_VALID: u32 = 4_102_444_800;
 
 const RICH_SIGNATURE: &[u8] = b"Rich";
 
-pub fn parse_pe(
-    pe: &PE,
-    data: &[u8],
-) -> Result<FormatResult, EngineError> {
-    let architecture = map_architecture(
-        pe.header.coff_header.machine,
-    );
+pub fn parse_pe(pe: &PE, data: &[u8]) -> Result<FormatResult, EngineError> {
+    let architecture = map_architecture(pe.header.coff_header.machine);
     let bits = if pe.is_64 { 64 } else { 32 };
     let endianness = Endianness::Little;
     let entry_point = pe.entry as u64;
 
     let is_stripped = pe.debug_data.is_none();
     let optional = pe.header.optional_header.as_ref();
-    let dll_chars = optional.map_or(0, |oh| {
-        oh.windows_fields.dll_characteristics
-    });
-    let is_pie = (dll_chars
-        & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)
-        != 0;
+    let dll_chars = optional.map_or(0, |oh| oh.windows_fields.dll_characteristics);
+    let is_pie = (dll_chars & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) != 0;
     let has_debug_info = pe.debug_data.is_some();
 
     let sections = build_sections(pe, data);
     let segments = build_segments(pe);
 
-    let timestamp =
-        pe.header.coff_header.time_date_stamp;
-    let image_base = optional
-        .map_or(0, |oh| oh.windows_fields.image_base);
-    let subsystem_raw = optional
-        .map_or(0, |oh| oh.windows_fields.subsystem);
+    let timestamp = pe.header.coff_header.time_date_stamp;
+    let image_base = optional.map_or(0, |oh| oh.windows_fields.image_base);
+    let subsystem_raw = optional.map_or(0, |oh| oh.windows_fields.subsystem);
     let linker_version = optional.map_or_else(
         || "0.0".into(),
         |oh| {
             format!(
                 "{}.{}",
-                oh.standard_fields.major_linker_version,
-                oh.standard_fields.minor_linker_version,
+                oh.standard_fields.major_linker_version, oh.standard_fields.minor_linker_version,
             )
         },
     );
@@ -117,47 +100,29 @@ pub fn parse_pe(
     let max_section_end = pe
         .sections
         .iter()
-        .map(|s| {
-            s.pointer_to_raw_data as u64
-                + s.size_of_raw_data as u64
-        })
+        .map(|s| s.pointer_to_raw_data as u64 + s.size_of_raw_data as u64)
         .max()
         .unwrap_or(0);
     let file_size = data.len() as u64;
-    let has_overlay =
-        max_section_end > 0 && max_section_end < file_size;
+    let has_overlay = max_section_end > 0 && max_section_end < file_size;
     let overlay_size = if has_overlay {
         file_size - max_section_end
     } else {
         0
     };
 
-    let pe_offset =
-        pe.header.dos_header.pe_pointer as usize;
-    let rich_header_present = detect_rich_header(
-        data,
-        pe_offset,
-    );
+    let pe_offset = pe.header.dos_header.pe_pointer as usize;
+    let rich_header_present = detect_rich_header(data, pe_offset);
 
     let pe_info = PeInfo {
         image_base,
         subsystem: subsystem_name(subsystem_raw),
         dll_characteristics: PeDllCharacteristics {
-            aslr: (dll_chars
-                & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)
-                != 0,
-            dep: (dll_chars
-                & IMAGE_DLLCHARACTERISTICS_NX_COMPAT)
-                != 0,
-            cfg: (dll_chars
-                & IMAGE_DLLCHARACTERISTICS_GUARD_CF)
-                != 0,
-            no_seh: (dll_chars
-                & IMAGE_DLLCHARACTERISTICS_NO_SEH)
-                != 0,
-            force_integrity: (dll_chars
-                & IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY)
-                != 0,
+            aslr: (dll_chars & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) != 0,
+            dep: (dll_chars & IMAGE_DLLCHARACTERISTICS_NX_COMPAT) != 0,
+            cfg: (dll_chars & IMAGE_DLLCHARACTERISTICS_GUARD_CF) != 0,
+            no_seh: (dll_chars & IMAGE_DLLCHARACTERISTICS_NO_SEH) != 0,
+            force_integrity: (dll_chars & IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY) != 0,
         },
         timestamp,
         linker_version,
@@ -167,11 +132,7 @@ pub fn parse_pe(
         rich_header_present,
     };
 
-    let mut anomalies = detect_common_anomalies(
-        &sections,
-        entry_point,
-        is_stripped,
-    );
+    let mut anomalies = detect_common_anomalies(&sections, entry_point, is_stripped);
     detect_pe_anomalies(
         &mut anomalies,
         pe,
@@ -213,15 +174,9 @@ fn map_architecture(machine: u16) -> Architecture {
     match machine {
         COFF_MACHINE_I386 => Architecture::X86,
         COFF_MACHINE_AMD64 => Architecture::X86_64,
-        COFF_MACHINE_ARM | COFF_MACHINE_ARMNT => {
-            Architecture::Arm
-        }
+        COFF_MACHINE_ARM | COFF_MACHINE_ARMNT => Architecture::Arm,
         COFF_MACHINE_ARM64 => Architecture::Aarch64,
-        other => {
-            Architecture::Other(format!(
-                "pe-machine-{other:#x}"
-            ))
-        }
+        other => Architecture::Other(format!("pe-machine-{other:#x}")),
     }
 }
 
@@ -232,53 +187,33 @@ fn subsystem_name(subsystem: u16) -> String {
         IMAGE_SUBSYSTEM_WINDOWS_GUI => "GUI".into(),
         IMAGE_SUBSYSTEM_WINDOWS_CUI => "Console".into(),
         IMAGE_SUBSYSTEM_POSIX_CUI => "POSIX".into(),
-        IMAGE_SUBSYSTEM_WINDOWS_CE_GUI => {
-            "Windows CE".into()
-        }
-        IMAGE_SUBSYSTEM_EFI_APPLICATION => {
-            "EFI Application".into()
-        }
-        IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER => {
-            "EFI Boot Service Driver".into()
-        }
-        IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER => {
-            "EFI Runtime Driver".into()
-        }
+        IMAGE_SUBSYSTEM_WINDOWS_CE_GUI => "Windows CE".into(),
+        IMAGE_SUBSYSTEM_EFI_APPLICATION => "EFI Application".into(),
+        IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER => "EFI Boot Service Driver".into(),
+        IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER => "EFI Runtime Driver".into(),
         IMAGE_SUBSYSTEM_XBOX => "Xbox".into(),
         other => format!("Unknown({other})"),
     }
 }
 
-fn build_sections(
-    pe: &PE,
-    data: &[u8],
-) -> Vec<SectionInfo> {
+fn build_sections(pe: &PE, data: &[u8]) -> Vec<SectionInfo> {
     pe.sections
         .iter()
         .map(|section| {
-            let name = section
-                .name()
-                .unwrap_or_default()
-                .to_string();
-            let raw_offset =
-                section.pointer_to_raw_data as u64;
-            let raw_size =
-                section.size_of_raw_data as u64;
+            let name = section.name().unwrap_or_default().to_string();
+            let raw_offset = section.pointer_to_raw_data as u64;
+            let raw_size = section.size_of_raw_data as u64;
             let chars = section.characteristics;
             let permissions = SectionPermissions {
                 read: (chars & IMAGE_SCN_MEM_READ) != 0,
                 write: (chars & IMAGE_SCN_MEM_WRITE) != 0,
-                execute: (chars & IMAGE_SCN_MEM_EXECUTE)
-                    != 0,
+                execute: (chars & IMAGE_SCN_MEM_EXECUTE) != 0,
             };
-            let sha256 = compute_section_hash(
-                data, raw_offset, raw_size,
-            );
+            let sha256 = compute_section_hash(data, raw_offset, raw_size);
 
             SectionInfo {
                 name,
-                virtual_address: section.virtual_address
-                    as u64,
+                virtual_address: section.virtual_address as u64,
                 virtual_size: section.virtual_size as u64,
                 raw_offset,
                 raw_size,
@@ -293,10 +228,7 @@ fn build_segments(_pe: &PE) -> Vec<SegmentInfo> {
     Vec::new()
 }
 
-fn detect_rich_header(
-    data: &[u8],
-    pe_offset: usize,
-) -> bool {
+fn detect_rich_header(data: &[u8], pe_offset: usize) -> bool {
     let end = pe_offset.min(data.len());
     data[..end]
         .windows(RICH_SIGNATURE.len())
@@ -313,34 +245,24 @@ fn detect_pe_anomalies(
     file_size: u64,
 ) {
     if timestamp == 0 {
-        anomalies.push(
-            FormatAnomaly::SuspiciousTimestamp {
-                value: timestamp,
-                reason: "zeroed timestamp".into(),
-            },
-        );
+        anomalies.push(FormatAnomaly::SuspiciousTimestamp {
+            value: timestamp,
+            reason: "zeroed timestamp".into(),
+        });
     } else if timestamp < PE_TIMESTAMP_MIN_VALID {
-        anomalies.push(
-            FormatAnomaly::SuspiciousTimestamp {
-                value: timestamp,
-                reason: "timestamp before 1990".into(),
-            },
-        );
+        anomalies.push(FormatAnomaly::SuspiciousTimestamp {
+            value: timestamp,
+            reason: "timestamp before 1990".into(),
+        });
     } else if timestamp > PE_TIMESTAMP_MAX_VALID {
-        anomalies.push(
-            FormatAnomaly::SuspiciousTimestamp {
-                value: timestamp,
-                reason: "timestamp after 2100".into(),
-            },
-        );
+        anomalies.push(FormatAnomaly::SuspiciousTimestamp {
+            value: timestamp,
+            reason: "timestamp after 2100".into(),
+        });
     }
 
     if has_tls {
-        anomalies.push(
-            FormatAnomaly::TlsCallbacksPresent {
-                count: 1,
-            },
-        );
+        anomalies.push(FormatAnomaly::TlsCallbacksPresent { count: 1 });
     }
 
     if pe.imports.is_empty() {

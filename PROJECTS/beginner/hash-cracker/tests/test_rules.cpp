@@ -17,18 +17,15 @@ Connects to:
   tests/data/small_wordlist.txt - fixture wordlist
 */
 
-#include <gtest/gtest.h>
 #include "src/attack/RuleAttack.hpp"
 #include "src/rules/RuleSet.hpp"
 #include <algorithm>
+#include <gtest/gtest.h>
+#include <ranges>
 #include <vector>
 
 static std::vector<std::string> collect(std::generator<std::string> gen) {
-    std::vector<std::string> out;
-    for (auto&& s : gen) {
-        out.push_back(std::move(s));
-    }
-    return out;
+    return std::ranges::to<std::vector<std::string>>(std::move(gen));
 }
 
 TEST(RuleSetTest, CapitalizeFirst) {
@@ -103,10 +100,14 @@ TEST(RuleAttackTest, ChainRulesProducesMoreCandidates) {
     ASSERT_TRUE(with_chain.has_value());
 
     std::size_t count_without = 0;
-    while (without->next()) { ++count_without; }
+    while (without->next()) {
+        ++count_without;
+    }
 
     std::size_t count_with = 0;
-    while (with_chain->next()) { ++count_with; }
+    while (with_chain->next()) {
+        ++count_with;
+    }
 
     EXPECT_GT(count_with, count_without);
 }
